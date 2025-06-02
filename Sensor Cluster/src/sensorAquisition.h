@@ -6,6 +6,29 @@
 #include <Adafruit_ADXL345_U.h>
 #include "FreeRTOS.h"
 
+// Enum for sensor data type
+typedef enum {
+    SENSOR_BARO,
+    SENSOR_ACCEL,
+    SENSOR_GPS
+} SensorType_t;
+
+// Data structures for sensor data
+typedef struct {
+    float pressure;
+    float temperature;
+} BaroData_t;
+
+typedef struct {
+    float x, y, z;
+} AccelData_t;
+
+typedef struct {
+    double latitude;
+    double longitude;
+    double altitude;
+} GPSData_t;
+
 void taskBarometer(void *pvParameters);
 void taskAccelerometer(void *pvParameters);
 void taskGPS(void *pvParameters);

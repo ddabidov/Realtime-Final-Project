@@ -1,18 +1,47 @@
 #include <Arduino.h>
+#include <FreeRTOS.h>
+#include <queue.h>
+#include "sensorAquisition.h"
+#include "dataOutput.h"
 
-// put function declarations here:
-int myFunction(int, int);
+
+QueueHandle_t displayQueue;
+QueueHandle_t barometerQueue;
+QueueHandle_t accelQueue;
+QueueHandle_t gpsQueue;
+// Sensor data structures
+
+
+// Forward declarations
+void taskBarometer(void *pvParameters);
+void taskAccelerometer(void *pvParameters);
+void taskGPS(void *pvParameters);
+void taskDisplay(void *pvParameters);
 
 void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+    Serial.begin(115200);
+
+    // Create display queue
+    displayQueue = xQueueCreate(10, sizeof(DisplayData_t));
+    barometerQueue = xQueueCreate(10, sizeof(BaroData_t));
+    accelQueue = xQueueCreate(10, sizeof(AccelData_t));
+    gpsQueue = xQueueCreate(10, sizeof(GPSData_t));
+
+    // Create sensor tasks, pass displayQueue to each
+    xTaskCreate(taskBarometer, "Baro", 1024, (void*)barometerQueue, 2, NULL);
+    vTaskCoreAffinitySet(taskBarometer,0x01); // Set barometer task to core 0
+    xTaskCreate(taskAccelerometer, "Accel", 1024, (void*)accelQueue, 2, NULL);
+    vTaskCoreAffinitySet(taskAccelerometer,0x01); // Set Accelerometer task to core 0
+    xTaskCreate(taskGPS, "GPS", 1024, (void*)gpsQueue, 2, NULL);
+    vTaskCoreAffinitySet(taskGPS,0x01); // Set GPS task to core 0
+
+    // Create display task (core 1)
+    xTaskCreate(taskDisplay, "Display", 2048, displayQueue, 1, NULL, 1);
+    vTaskCoreAffinitySet(displayQueue,0x02); // Set barometer task to core 0
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+    // Not used with FreeRTOS
 }
 
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
-}
+

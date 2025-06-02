@@ -57,7 +57,7 @@ void taskGPS(void *pvParameters) {
     }
 }
 
-void taskAdxl(void *pvParameters) {
+void taskAccelerometer(void *pvParameters) {
     // Initialize the ADXL sensor
     if (!adxl.begin()) {
         Serial.println("Failed to initialize ADXL!");
