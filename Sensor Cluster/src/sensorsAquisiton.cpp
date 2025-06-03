@@ -1,4 +1,4 @@
-#include "sensorsAquisiton.h"
+#include "sensorAquisition.h"
 #include <Arduino.h>
 #include <SFE_BMP180.h>
 #include <Wire.h>
@@ -10,6 +10,7 @@
 
 
 void taskBarometer(void *pvParameters) {
+    QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
     // Initialize the barometer sensor
     if (!barometer.begin()) {
         Serial.println("Failed to initialize barometer!");
@@ -22,12 +23,11 @@ void taskBarometer(void *pvParameters) {
         float pressure = barometer.readPressure();
         float temperature = barometer.readTemperature();
 
-        // Print the data to the serial monitor
-        Serial.print("Pressure: ");
-        Serial.print(pressure);
-        Serial.print(" hPa, Temperature: ");
-        Serial.print(temperature);
-        Serial.println(" °C");
+        DisplayData_t msg;
+        msg.type = SENSOR_BARO;
+        msg.data.baro.pressure = pressure;
+        msg.data.baro.temperature = temperature;
+        xQueueSend(displayQueue, &msg, 0);
 
         // Delay for a while before the next reading
         vTaskDelay(pdMS_TO_TICKS(1000));
@@ -35,6 +35,7 @@ void taskBarometer(void *pvParameters) {
 }
 
 void taskGPS(void *pvParameters) {
+    QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
     // Initialize the GPS sensor
     if (!gps.begin()) {
         Serial.println("Failed to initialize GPS!");
@@ -45,19 +46,24 @@ void taskGPS(void *pvParameters) {
     while (true) {
         // Read the GPS data
         if (gps.available()) {
-            String location = gps.readLocation();
-            Serial.print("GPS Location: ");
-            Serial.println(location);
-        } else {
-            Serial.println("No GPS data available.");
-        }
+            // Replace with actual GPS data extraction
+            GPSData_t gpsData;
+            gpsData.latitude = gps.location.lat();
+            gpsData.longitude = gps.location.lng();
+            gpsData.altitude = gps.altitude.meters();
 
+            DisplayData_t msg;
+            msg.type = SENSOR_GPS;
+            msg.data.gps = gpsData;
+            xQueueSend(displayQueue, &msg, 0);
+        }
         // Delay for a while before the next reading
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(10000)); // Example: poll every 10s
     }
 }
 
 void taskAccelerometer(void *pvParameters) {
+    QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
     // Initialize the ADXL sensor
     if (!adxl.begin()) {
         Serial.println("Failed to initialize ADXL!");
@@ -69,14 +75,15 @@ void taskAccelerometer(void *pvParameters) {
         // Read the ADXL data
         float x, y, z;
         adxl.readAcceleration(x, y, z);
-        Serial.print("ADXL Acceleration - X: ");
-        Serial.print(x);
-        Serial.print(", Y: ");
-        Serial.print(y);
-        Serial.print(", Z: ");
-        Serial.println(z);
+
+        DisplayData_t msg;
+        msg.type = SENSOR_ACCEL;
+        msg.data.accel.x = x;
+        msg.data.accel.y = y;
+        msg.data.accel.z = z;
+        xQueueSend(displayQueue, &msg, 0);
 
         // Delay for a while before the next reading
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(20)); // Example: poll every 20ms
     }
 }

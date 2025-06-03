@@ -29,15 +29,15 @@ void setup() {
 
     // Create sensor tasks, pass displayQueue to each
     xTaskCreate(taskBarometer, "Baro", 1024, (void*)barometerQueue, 2, NULL);
-    vTaskCoreAffinitySet(taskBarometer,0x01); // Set barometer task to core 0
+    vTaskCoreAffinitySet((TaskHandle_t) taskBarometer,0x01); // Set barometer task to core 0
     xTaskCreate(taskAccelerometer, "Accel", 1024, (void*)accelQueue, 2, NULL);
-    vTaskCoreAffinitySet(taskAccelerometer,0x01); // Set Accelerometer task to core 0
+    vTaskCoreAffinitySet((TaskHandle_t) taskAccelerometer,0x01); // Set Accelerometer task to core 0
     xTaskCreate(taskGPS, "GPS", 1024, (void*)gpsQueue, 2, NULL);
-    vTaskCoreAffinitySet(taskGPS,0x01); // Set GPS task to core 0
+    vTaskCoreAffinitySet((TaskHandle_t) taskGPS,0x01); // Set GPS task to core 0
 
     // Create display task (core 1)
-    xTaskCreate(taskDisplay, "Display", 2048, displayQueue, 1, NULL, 1);
-    vTaskCoreAffinitySet(displayQueue,0x02); // Set barometer task to core 0
+    xTaskCreate(taskDisplay, "Display", 2048, displayQueue, 1, NULL);
+    vTaskCoreAffinitySet((TaskHandle_t) taskDisplay,0x02); // Set barometer task to core 0
 }
 
 void loop() {
