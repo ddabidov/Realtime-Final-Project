@@ -4,6 +4,8 @@
 #include "sensorAquisition.h"
 #include "dataOutput.h"
 
+extern QueueHandle_t displayQueue;
+
 // Display task: handles any sensor data received
 void taskDisplay(void *pvParameters) {
     DisplayData_t data;
