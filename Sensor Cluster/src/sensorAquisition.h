@@ -20,6 +20,7 @@ typedef enum {
 typedef struct {
     float pressure;
     float temperature;
+    float altitude; // Altitude can be calculated from pressure
 } BaroData_t;
 
 typedef struct {
