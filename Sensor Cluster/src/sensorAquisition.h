@@ -1,3 +1,6 @@
+#ifndef SENSOR_AQUISITION_H
+#define SENSOR_AQUISITION_H
+
 #include <Arduino.h>
 #include <SFE_BMP180.h>
 #include <Wire.h>
@@ -29,6 +32,18 @@ typedef struct {
     double altitude;
 } GPSData_t;
 
+// Unified display data struct
+typedef struct {
+    SensorType_t type;
+    union {
+        BaroData_t baro;
+        AccelData_t accel;
+        GPSData_t gps;
+    } data;
+} DisplayData_t;
+
 void taskBarometer(void *pvParameters);
 void taskAccelerometer(void *pvParameters);
 void taskGPS(void *pvParameters);
+
+#endif // SENSOR_AQUISITION_H
