@@ -56,7 +56,6 @@ void taskBarometer(void *pvParameters) {
     Serial.println();
     delay(500);
     }
-}
 
 void taskGPS(void *pvParameters) {
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
