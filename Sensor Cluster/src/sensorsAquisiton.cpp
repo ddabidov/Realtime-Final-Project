@@ -1,6 +1,6 @@
 #include "sensorAquisition.h"
 #include <Arduino.h>
-#include <SFE_BMP180.h>
+#include <Adafruit_BMP085.h>
 #include <Wire.h>
 #include <TinyGPSPlus.h>   
 #include <Adafruit_Sensor.h>
