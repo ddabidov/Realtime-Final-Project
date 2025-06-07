@@ -57,29 +57,105 @@ void taskBarometer(void *pvParameters) {
     delay(500);
     }
 
+
+void displayInfo()
+{
+  Serial.print(F("Location: ")); 
+  if (gps.location.isValid())
+  {
+    Serial.print(gps.location.lat(), 6);
+    Serial.print(F(","));
+    Serial.print(gps.location.lng(), 6);
+  }
+  else
+  {
+    Serial.print(F("INVALID"));
+  }
+
+  Serial.print(F("  Date/Time: "));
+  if (gps.date.isValid())
+  {
+    Serial.print(gps.date.month());
+    Serial.print(F("/"));
+    Serial.print(gps.date.day());
+    Serial.print(F("/"));
+    Serial.print(gps.date.year());
+  }
+  else
+  {
+    Serial.print(F("INVALID"));
+  }
+
+  Serial.print(F(" "));
+  if (gps.time.isValid())
+  {
+    if (gps.time.hour() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.hour());
+    Serial.print(F(":"));
+    if (gps.time.minute() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.minute());
+    Serial.print(F(":"));
+    if (gps.time.second() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.second());
+    Serial.print(F("."));
+    if (gps.time.centisecond() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.centisecond());
+  }
+  else
+  {
+    Serial.print(F("INVALID"));
+  }
+
+  Serial.println();
+}
+    
 void taskGPS(void *pvParameters) {
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
     // Initialize the GPS sensor
-    if (!gps.begin()) {
-        Serial.println("Failed to initialize GPS!");
-        vTaskDelete(NULL);
-        return;
-    }
+    TinyGPSPlus gps;
+
+    gpsSerial.setRX(GPS_RX_PIN);
+    gpsSerial.setTX(GPS_TX_PIN);
+    gpsSerial.begin(9600); // Start GPS serial on Serial1 with specified pins
+
+    Serial.println(F("BasicExample.ino"));
+    Serial.println(F("Basic demonstration of TinyGPSPlus with hardware serial"));
+    Serial.print(F("Testing TinyGPSPlus library v. ")); Serial.println(TinyGPSPlus::libraryVersion());
+    Serial.println(F("by Mikal Hart"));
+    Serial.println();
 
     while (true) {
-        // Read the GPS data
-        if (gps.available()) {
-            // Replace with actual GPS data extraction
-            GPSData_t gpsData;
-            gpsData.latitude = gps.location.lat();
-            gpsData.longitude = gps.location.lng();
-            gpsData.altitude = gps.altitude.meters();
+        static unsigned long lastDataTime = 0;
+    static unsigned long lastCheckTime = 0;
+    static bool gpsEverReceived = false;
 
-            DisplayData_t msg;
-            msg.type = SENSOR_GPS;
-            msg.data.gps = gpsData;
-            xQueueSend(displayQueue, &msg, 0);
-        }
+    // Check for incoming data from GPS
+    while (gpsSerial.available() > 0)
+    {
+      char c = gpsSerial.read();
+      lastDataTime = millis(); // Update time of last received byte
+      gpsEverReceived = true;
+      if (gps.encode(c))
+        displayInfo();
+      }
+
+    // Periodically check GPS connection status
+    if (millis() - lastCheckTime > 1000) // Every 1 second
+    {
+        lastCheckTime = millis();
+    if (!gpsEverReceived)
+    {
+      Serial.println(F("GPS not detected: No data received yet."));
+    }
+    else if (millis() - lastDataTime > 2000)
+    {
+      Serial.println(F("GPS disconnected or not sending data!"));
+    }
+    else
+    {
+      Serial.println(F("GPS connected: Data is being received."));
+    }
+  }
         // Delay for a while before the next reading
         vTaskDelay(pdMS_TO_TICKS(10000)); // Example: poll every 10s
     }

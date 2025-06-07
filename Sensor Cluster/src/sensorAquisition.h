@@ -9,6 +9,12 @@
 #include <Adafruit_ADXL345_U.h>
 #include "FreeRTOS.h"
 
+#define GPS_RX_PIN 13
+#define GPS_TX_PIN 12
+
+#define gpsSerial Serial1  // Use built-in Serial1 for Pi Pico
+
+
 // Enum for sensor data type
 typedef enum {
     SENSOR_BARO,
