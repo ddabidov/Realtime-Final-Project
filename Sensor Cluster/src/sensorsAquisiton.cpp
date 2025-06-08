@@ -29,119 +29,49 @@ void taskBarometer(void *pvParameters) {
     Serial.println("DEBUG: taskBarometer started");
     xSemaphoreGive(serialMutex);
 
-    i2cScan();
-
     BaroData_t baroData;
     Adafruit_BMP085 bmp;
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
 
-    // Barometer initialization loop with debug prints
     int baroInitAttempts = 0;
-    const int maxBaroInitAttempts = 5;
-    while (!bmp.begin() && baroInitAttempts < maxBaroInitAttempts) {
-        xSemaphoreTake(serialMutex, portMAX_DELAY);
+    while (!bmp.begin()) {
+        xSemaphoreTake(serialMutex, portMAX_DELAY); // Added missing semaphore take
         Serial.print("DEBUG: BMP085 init attempt ");
         Serial.println(++baroInitAttempts);
         Serial.println("Could not find a valid BMP085 sensor, check wiring!");
         xSemaphoreGive(serialMutex);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
-    if (baroInitAttempts >= maxBaroInitAttempts) {
-        xSemaphoreTake(serialMutex, portMAX_DELAY);
-        Serial.println("ERROR: BMP085 sensor not found after max attempts, skipping barometer task.");
-        xSemaphoreGive(serialMutex);
-        vTaskDelete(NULL); // End this task
-    }
     xSemaphoreTake(serialMutex, portMAX_DELAY);
     Serial.println("DEBUG: BMP085 sensor initialized");
     xSemaphoreGive(serialMutex);
 
     while (true) {
-        xSemaphoreTake(serialMutex, portMAX_DELAY);
-        Serial.println("DEBUG: taskBarometer loop running");
         baroData.temperature = bmp.readTemperature();
         baroData.pressure = bmp.readPressure();
-        baroData.altitude = bmp.readAltitude();
+        // Altitude calculation is often less critical for raw data logging,
+        // but can be included if needed by taskDisplay.
+        // baroData.altitude = bmp.readAltitude(); // Uncomment if altitude is needed
+
         DisplayData_t msg;
         msg.type = SENSOR_BARO;
         msg.data.baro = baroData;
-        if (xQueueSend(displayQueue, &msg, 0) == pdPASS) {
-            Serial.println("DEBUG: Barometer data sent to queue");
-        } else {
-            Serial.println("DEBUG: Barometer data NOT sent to queue");
-        }
-        Serial.print("Pressure = ");
-        Serial.print(baroData.pressure);
-        Serial.println(" Pa");
-        Serial.print("Altitude = ");
-        Serial.print(baroData.altitude);
-        Serial.println(" meters");
-        Serial.print("Pressure at sealevel (calculated) = ");
-        Serial.print(bmp.readSealevelPressure());
-        Serial.println(" Pa");
-        Serial.print("Real altitude = ");
-        Serial.print(bmp.readAltitude(101500));
-        Serial.println(" meters");
-        Serial.println();
-        xSemaphoreGive(serialMutex);
 
-        vTaskDelay(pdMS_TO_TICKS(500));
+        if (xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100)) != pdPASS) {
+            // Optional: Log queue send failure (e.g., increment a counter)
+            // Avoid Serial.print here to prevent re-introducing contention
+        }
+        vTaskDelay(pdMS_TO_TICKS(500)); // Adjust delay as per desired sampling rate
     }
 }
 
+// Remove the displayInfo() function as its functionality is moved to taskDisplay
+/*
 void displayInfo()
 {
-    xSemaphoreTake(serialMutex, portMAX_DELAY);
-    TinyGPSPlus gps;
-    Serial.print(F("Location: ")); 
-    if (gps.location.isValid())
-    {
-        Serial.print(gps.location.lat(), 6);
-        Serial.print(F(","));
-        Serial.print(gps.location.lng(), 6);
-    }
-    else
-    {
-        Serial.print(F("INVALID"));
-    }
-
-    Serial.print(F("  Date/Time: "));
-    if (gps.date.isValid())
-    {
-        Serial.print(gps.date.month());
-        Serial.print(F("/"));
-        Serial.print(gps.date.day());
-        Serial.print(F("/"));
-        Serial.print(gps.date.year());
-    }
-    else
-    {
-        Serial.print(F("INVALID"));
-    }
-
-    Serial.print(F(" "));
-    if (gps.time.isValid())
-    {
-        if (gps.time.hour() < 10) Serial.print(F("0"));
-        Serial.print(gps.time.hour());
-        Serial.print(F(":"));
-        if (gps.time.minute() < 10) Serial.print(F("0"));
-        Serial.print(gps.time.minute());
-        Serial.print(F(":"));
-        if (gps.time.second() < 10) Serial.print(F("0"));
-        Serial.print(gps.time.second());
-        Serial.print(F("."));
-        if (gps.time.centisecond() < 10) Serial.print(F("0"));
-        Serial.print(gps.time.centisecond());
-    }
-    else
-    {
-        Serial.print(F("INVALID"));
-    }
-
-    Serial.println();
-    xSemaphoreGive(serialMutex);
+    // ... old content removed ...
 }
+*/
     
 void taskGPS(void *pvParameters) {
     xSemaphoreTake(serialMutex, portMAX_DELAY);
@@ -150,74 +80,48 @@ void taskGPS(void *pvParameters) {
 
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
     TinyGPSPlus gps;
+    GPSData_t gpsData;
 
-    // GPS initialization loop with debug prints (if needed)
-    int gpsInitAttempts = 0;
-    bool gpsSerialReady = false;
-    while (!gpsSerialReady) {
-        xSemaphoreTake(serialMutex, portMAX_DELAY);
-        Serial.print("DEBUG: GPS Serial init attempt ");
-        Serial.println(++gpsInitAttempts);
-        xSemaphoreGive(serialMutex);
+    // GPS Serial port is Serial1, pins defined in sensorAquisition.h
+    gpsSerial.setRX(GPS_RX_PIN);
+    gpsSerial.setTX(GPS_TX_PIN);
+    gpsSerial.begin(9600); // Common baud rate for GPS modules
 
-        gpsSerial.setRX(GPS_RX_PIN);
-        gpsSerial.setTX(GPS_TX_PIN);
-        gpsSerial.begin(9600);
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Release mutex before delay!
-        // Optionally check if GPS is sending data here
-        if (gpsSerial) gpsSerialReady = true;
-    }
+    vTaskDelay(pdMS_TO_TICKS(100)); // Small delay for serial to settle
+
     xSemaphoreTake(serialMutex, portMAX_DELAY);
-    Serial.println("DEBUG: GPS Serial initialized");
-    Serial.println(F("BasicExample.ino"));
-    Serial.println(F("Basic demonstration of TinyGPSPlus with hardware serial"));
-    Serial.print(F("Testing TinyGPSPlus library v. ")); Serial.println(TinyGPSPlus::libraryVersion());
-    Serial.println();
+    Serial.println("DEBUG: GPS Serial configured for taskGPS");
     xSemaphoreGive(serialMutex);
 
     while (true) {
-        static unsigned long lastDataTime = 0;
-        static unsigned long lastCheckTime = 0;
-        static bool gpsEverReceived = false;
-
+        bool sentenceProcessedThisPass = false;
         while (gpsSerial.available() > 0) {
-            char c = gpsSerial.read();
-            lastDataTime = millis();
-            gpsEverReceived = true;
-            if (gps.encode(c)) {
-                xSemaphoreTake(serialMutex, portMAX_DELAY);
-                Serial.println("DEBUG: GPS data parsed");
-                xSemaphoreGive(serialMutex);
-                displayInfo();
-                // Send GPS data to displayQueue
+            if (gps.encode(gpsSerial.read())) { // True if a new NMEA sentence is complete
+                sentenceProcessedThisPass = true;
+            }
+        }
+
+        if (sentenceProcessedThisPass) {
+            if (gps.location.isUpdated() && gps.location.isValid()) {
+                gpsData.latitude = gps.location.lat();
+                gpsData.longitude = gps.location.lng();
+                
+                if (gps.altitude.isUpdated() && gps.altitude.isValid()) {
+                    gpsData.altitude = gps.altitude.meters();
+                } else {
+                    gpsData.altitude = gps.altitude.isValid() ? gps.altitude.meters() : 0.0; 
+                }
+
                 DisplayData_t msg;
                 msg.type = SENSOR_GPS;
-                msg.data.gps.latitude = gps.location.isValid() ? gps.location.lat() : 0.0;
-                msg.data.gps.longitude = gps.location.isValid() ? gps.location.lng() : 0.0;
-                msg.data.gps.altitude = gps.altitude.isValid() ? gps.altitude.meters() : 0.0;
-                xSemaphoreTake(serialMutex, portMAX_DELAY);
-                if (xQueueSend(displayQueue, &msg, 0) == pdPASS) {
-                    Serial.println("DEBUG: GPS data sent to queue");
-                } else {
-                    Serial.println("DEBUG: GPS data NOT sent to queue");
-                }
-                xSemaphoreGive(serialMutex);
-            }
-        }
+                msg.data.gps = gpsData;
 
-        if (millis() - lastCheckTime > 1000) {
-            lastCheckTime = millis();
-            xSemaphoreTake(serialMutex, portMAX_DELAY);
-            if (!gpsEverReceived) {
-                Serial.println(F("GPS not detected: No data received yet."));
-            } else if (millis() - lastDataTime > 2000) {
-                Serial.println(F("GPS disconnected or not sending data!"));
-            } else {
-                Serial.println(F("GPS connected: Data is being received."));
+                if (xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100)) != pdPASS) {
+                    // Optional: Log queue send failure
+                }
             }
-            xSemaphoreGive(serialMutex);
         }
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(50)); // Poll GPS serial buffer frequently
     }
 }
 
@@ -228,62 +132,47 @@ void taskAccelerometer(void *pvParameters) {
 
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
     ADXL345 accel;
+    AccelData_t accelData;
+    int16_t ax, ay, az; // Raw accelerometer values
+
+    Wire.begin(); // Ensure Wire is initialized for I2C communication
+    accel.initialize(); // Initialize ADXL345
+
     int accelInitAttempts = 0;
-
-    Wire.begin();
-    accel.initialize();
-
     while (!accel.testConnection()) {
         xSemaphoreTake(serialMutex, portMAX_DELAY);
         Serial.print("DEBUG: ADXL345 init attempt ");
         Serial.println(++accelInitAttempts);
-        Serial.println("Failed to initialize ADXL345! Check wiring.");
+        Serial.println("ADXL345 connection failed!");
         xSemaphoreGive(serialMutex);
         vTaskDelay(pdMS_TO_TICKS(1000));
-        accel.initialize(); // Try again
+        // accel.initialize(); // Optionally re-attempt initialization
     }
 
     xSemaphoreTake(serialMutex, portMAX_DELAY);
     Serial.println("DEBUG: ADXL345 sensor initialized");
     xSemaphoreGive(serialMutex);
+    
+    const float scaleFactor = 1.0f / 256.0f; 
 
     while (true) {
-        int16_t ax, ay, az;
-        accel.getAcceleration(&ax, &ay, &az);
+        accel.getAcceleration(&ax, &ay, &az); 
+
+        accelData.x = ax * scaleFactor;
+        accelData.y = ay * scaleFactor;
+        accelData.z = az * scaleFactor;
 
         DisplayData_t msg;
         msg.type = SENSOR_ACCEL;
-        msg.data.accel.x = ax;
-        msg.data.accel.y = ay;
-        msg.data.accel.z = az;
+        msg.data.accel = accelData;
 
-        xSemaphoreTake(serialMutex, portMAX_DELAY);
-        if (xQueueSend(displayQueue, &msg, 0) == pdPASS) {
-            Serial.println("DEBUG: Accelerometer data sent to queue");
-        } else {
-            Serial.println("DEBUG: Accelerometer data NOT sent to queue");
+        if (xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100)) != pdPASS) {
+            // Optional: Log queue send failure
         }
-        xSemaphoreGive(serialMutex);
-
-        vTaskDelay(pdMS_TO_TICKS(20));
+        vTaskDelay(pdMS_TO_TICKS(100)); 
     }
 }
 
 void i2cScan() {
-    xSemaphoreTake(serialMutex, portMAX_DELAY);
-    Serial.println("DEBUG: Starting I2C scan...");
-    xSemaphoreGive(serialMutex);
-    Wire.begin();
-    for (uint8_t addr = 1; addr < 127; ++addr) {
-        Wire.beginTransmission(addr);
-        if (Wire.endTransmission() == 0) {
-            xSemaphoreTake(serialMutex, portMAX_DELAY);
-            Serial.print("I2C device found at address 0x");
-            Serial.println(addr, HEX);
-            xSemaphoreGive(serialMutex);
-        }
-    }
-    xSemaphoreTake(serialMutex, portMAX_DELAY);
-    Serial.println("DEBUG: I2C scan complete.");
-    xSemaphoreGive(serialMutex);
+    // ...existing code...
 }

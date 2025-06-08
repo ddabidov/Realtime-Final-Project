@@ -4,10 +4,9 @@
 #include "sensorAquisition.h"
 #include "dataOutput.h"
 
-extern QueueHandle_t displayQueue;
-
 // Display task: handles any sensor data received
 void taskDisplay(void *pvParameters) {
+    QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
     DisplayData_t data;
     for (;;) {
         if (xQueueReceive(displayQueue, &data, portMAX_DELAY) == pdPASS) {
