@@ -5,30 +5,7 @@
 // EOC is not used, it signifies an end of conversion
 // XCLR is a reset pin, also not used here
 
-
-/*                                  |
-//                                  |
-//                             _____|_____
-//                             \         /
-//                              \       / 
-//                               \     /
-//                                \   / 
-//                                 \ /
-//                                  V
-//****************************************************************************
-//PLUG SCL INTO GP5 AND SDA INTO GP4 ON PI PICO!!!!!!!!!!!!!!
-//****************************************************************************
-//                                  ^
-//                                 / \
-//                                /   \
-//                               /     \
-//                              /       \
-//                             /         \ 
-//                             -----------
-//                                  |
-//                                  |
-//                                  |
-*/
+//both BMP180 and ADXL345 use I2C so they can share the same SDA and SCL lines (gpio 4 and 5 on the pi pico)
 
 
 
@@ -69,10 +46,9 @@ void taskBarometer(void *pvParameters) {
         }
         xSemaphoreGive(serialMutex);
         vTaskDelay(500);
-    }
-    xSemaphoreTake(serialMutex, portMAX_DELAY);
-    Serial.println("DEBUG: BMP085 sensor initialized");
-    xSemaphoreGive(serialMutex);
+        xSemaphoreTake(serialMutex, portMAX_DELAY);
+        Serial.println("DEBUG: BMP085 sensor initialized");
+        xSemaphoreGive(serialMutex);
 
     while (true) {
         xSemaphoreTake(serialMutex, portMAX_DELAY);
@@ -262,6 +238,11 @@ void taskAccelerometer(void *pvParameters) {
     int accelInitAttempts = 0;
     while (!adxl.begin()) {
         xSemaphoreTake(serialMutex, portMAX_DELAY);
+        Wire.begin();
+        accel.initialize();
+        if(accel.testConnection()){
+            break;
+        } 
         Serial.print("DEBUG: ADXL345 init attempt ");
         Serial.println(++accelInitAttempts);
         Serial.println("Failed to initialize ADXL345! Check wiring.");
@@ -273,13 +254,14 @@ void taskAccelerometer(void *pvParameters) {
     xSemaphoreGive(serialMutex);
 
     while (true) {
-        adxl.getEvent(&event);
+        int16_t ax, ay, az;
+        accel.getAcceleration(&ax, &ay, &az);
 
         DisplayData_t msg;
         msg.type = SENSOR_ACCEL;
-        msg.data.accel.x = event.acceleration.x;
-        msg.data.accel.y = event.acceleration.y;
-        msg.data.accel.z = event.acceleration.z;
+        msg.data.accel.x = ax;
+        msg.data.accel.y = ay;
+        msg.data.accel.z = az;
 
         xSemaphoreTake(serialMutex, portMAX_DELAY);
         if (xQueueSend(displayQueue, &msg, 0) == pdPASS) {
