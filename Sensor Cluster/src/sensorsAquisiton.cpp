@@ -37,13 +37,20 @@ void taskBarometer(void *pvParameters) {
 
     // Barometer initialization loop with debug prints
     int baroInitAttempts = 0;
-    while (!bmp.begin()) {
+    const int maxBaroInitAttempts = 5;
+    while (!bmp.begin() && baroInitAttempts < maxBaroInitAttempts) {
         xSemaphoreTake(serialMutex, portMAX_DELAY);
         Serial.print("DEBUG: BMP085 init attempt ");
         Serial.println(++baroInitAttempts);
         Serial.println("Could not find a valid BMP085 sensor, check wiring!");
         xSemaphoreGive(serialMutex);
         vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+    if (baroInitAttempts >= maxBaroInitAttempts) {
+        xSemaphoreTake(serialMutex, portMAX_DELAY);
+        Serial.println("ERROR: BMP085 sensor not found after max attempts, skipping barometer task.");
+        xSemaphoreGive(serialMutex);
+        vTaskDelete(NULL); // End this task
     }
     xSemaphoreTake(serialMutex, portMAX_DELAY);
     Serial.println("DEBUG: BMP085 sensor initialized");
