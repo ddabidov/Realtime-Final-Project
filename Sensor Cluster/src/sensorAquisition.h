@@ -2,12 +2,18 @@
 #define SENSOR_AQUISITION_H
 
 #include <Arduino.h>
-#include <SFE_BMP180.h>
+#include <Adafruit_BMP085.h>
 #include <Wire.h>
 #include <TinyGPSPlus.h>   
 #include <Adafruit_Sensor.h>
 #include <Adafruit_ADXL345_U.h>
 #include "FreeRTOS.h"
+
+#define GPS_RX_PIN 13
+#define GPS_TX_PIN 12
+
+#define gpsSerial Serial1  // Use built-in Serial1 for Pi Pico
+
 
 // Enum for sensor data type
 typedef enum {
