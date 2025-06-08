@@ -52,5 +52,6 @@ typedef struct {
 void taskBarometer(void *pvParameters);
 void taskAccelerometer(void *pvParameters);
 void taskGPS(void *pvParameters);
+void i2cScan(void); // <-- Add this line
 
 #endif // SENSOR_AQUISITION_H

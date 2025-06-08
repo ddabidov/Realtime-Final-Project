@@ -32,6 +32,13 @@ void setup() {
     delay(1000); // Give time for USB CDC to initialize
     Serial.println("DEBUG: Post USB CDC delay");
 
+    // CREATE THE MUTEX FIRST!
+    serialMutex = xSemaphoreCreateMutex();
+    if (serialMutex == NULL) {
+        Serial.println("ERROR: Failed to create serial mutex!");
+        while (1) { delay(1000); }
+    }
+
     displayQueue = xQueueCreate(10, sizeof(DisplayData_t));
     Serial.println("DEBUG: displayQueue created");
     barometerQueue = xQueueCreate(10, sizeof(BaroData_t));
@@ -55,12 +62,6 @@ void setup() {
     vTaskCoreAffinitySet(accelTaskHandle, 0x01);
     vTaskCoreAffinitySet(gpsTaskHandle, 0x01);
     vTaskCoreAffinitySet(displayTaskHandle, 0x02);
-
-    serialMutex = xSemaphoreCreateMutex();
-    if (serialMutex == NULL) {
-        Serial.println("ERROR: Failed to create serial mutex!");
-        while (1) { delay(1000); }
-    }
 
     Serial.println("DEBUG: setup() complete");
 
