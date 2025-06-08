@@ -6,8 +6,9 @@
 #include <Wire.h>
 #include <TinyGPSPlus.h>   
 #include <Adafruit_Sensor.h>
-#include <Adafruit_ADXL345_U.h>
+#include "I2Cdev.h"
 #include "FreeRTOS.h"
+
 
 #define GPS_RX_PIN 13
 #define GPS_TX_PIN 12

@@ -55,13 +55,13 @@ void setup() {
     Serial.println("DEBUG: taskAccelerometer created");
     xTaskCreate(taskGPS, "GPS", 1024, (void*)gpsQueue, 2, &gpsTaskHandle);
     Serial.println("DEBUG: taskGPS created");
-    xTaskCreate(taskDisplay, "Display", 2048, displayQueue, 1, &displayTaskHandle);
-    Serial.println("DEBUG: taskDisplay created");
+    //xTaskCreate(taskDisplay, "Display", 2048, displayQueue, 1, &displayTaskHandle);
+    //Serial.println("DEBUG: taskDisplay created");
 
     vTaskCoreAffinitySet(baroTaskHandle, 0x01);
     vTaskCoreAffinitySet(accelTaskHandle, 0x01);
     vTaskCoreAffinitySet(gpsTaskHandle, 0x01);
-    vTaskCoreAffinitySet(displayTaskHandle, 0x02);
+    //vTaskCoreAffinitySet(displayTaskHandle, 0x02);
 
     Serial.println("DEBUG: setup() complete");
 

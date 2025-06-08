@@ -15,7 +15,6 @@
 #include <Wire.h>
 #include <TinyGPSPlus.h>   
 #include <Adafruit_Sensor.h>
-#include <Adafruit_ADXL345_U.h>
 #include "FreeRTOS.h"
 #include <queue.h>
 #include "semphr.h"
@@ -29,7 +28,7 @@ void taskBarometer(void *pvParameters) {
     Serial.println("DEBUG: taskBarometer started");
     xSemaphoreGive(serialMutex);
 
-    i2cScan(); // Add this line
+    i2cScan();
 
     BaroData_t baroData;
     Adafruit_BMP085 bmp;
@@ -47,10 +46,11 @@ void taskBarometer(void *pvParameters) {
             }
         }
         xSemaphoreGive(serialMutex);
-        vTaskDelay(500);
-        xSemaphoreTake(serialMutex, portMAX_DELAY);
-        Serial.println("DEBUG: BMP085 sensor initialized");
-        xSemaphoreGive(serialMutex);
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Release mutex before delay!
+    }
+    xSemaphoreTake(serialMutex, portMAX_DELAY);
+    Serial.println("DEBUG: BMP085 sensor initialized");
+    xSemaphoreGive(serialMutex);
 
     while (true) {
         xSemaphoreTake(serialMutex, portMAX_DELAY);
@@ -181,7 +181,7 @@ void taskGPS(void *pvParameters) {
         gpsSerial.setRX(GPS_RX_PIN);
         gpsSerial.setTX(GPS_TX_PIN);
         gpsSerial.begin(9600);
-        vTaskDelay(500);
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Release mutex before delay!
         // Optionally check if GPS is sending data here
         if (gpsSerial) gpsSerialReady = true;
     }
@@ -190,7 +190,6 @@ void taskGPS(void *pvParameters) {
     Serial.println(F("BasicExample.ino"));
     Serial.println(F("Basic demonstration of TinyGPSPlus with hardware serial"));
     Serial.print(F("Testing TinyGPSPlus library v. ")); Serial.println(TinyGPSPlus::libraryVersion());
-    Serial.println(F("by Mikal Hart"));
     Serial.println();
     xSemaphoreGive(serialMutex);
 
@@ -233,12 +232,12 @@ void taskAccelerometer(void *pvParameters) {
     xSemaphoreGive(serialMutex);
 
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
-    Adafruit_ADXL345_Unified adxl;
+    ADXL345 accel;
     sensors_event_t event;
 
     // Accelerometer initialization loop with debug prints
     int accelInitAttempts = 0;
-    while (!adxl.begin()) {
+    while (!accel.begin()) {
         xSemaphoreTake(serialMutex, portMAX_DELAY);
         Wire.begin();
         accel.initialize();
@@ -249,7 +248,7 @@ void taskAccelerometer(void *pvParameters) {
         Serial.println(++accelInitAttempts);
         Serial.println("Failed to initialize ADXL345! Check wiring.");
         xSemaphoreGive(serialMutex);
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Release mutex before delay!
     }
     xSemaphoreTake(serialMutex, portMAX_DELAY);
     Serial.println("DEBUG: ADXL345 sensor initialized");
