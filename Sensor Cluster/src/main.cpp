@@ -3,7 +3,7 @@
 #include <queue.h>
 #include "sensorAquisition.h"
 #include "dataOutput.h"
-
+#include "semphr.h"
 
 QueueHandle_t displayQueue;
 QueueHandle_t barometerQueue;
@@ -11,6 +11,7 @@ QueueHandle_t accelQueue;
 QueueHandle_t gpsQueue;
 // Sensor data structures
 
+SemaphoreHandle_t serialMutex; // Add this line
 
 // Forward declarations
 void taskBarometer(void *pvParameters);
@@ -18,26 +19,52 @@ void taskAccelerometer(void *pvParameters);
 void taskGPS(void *pvParameters);
 void taskDisplay(void *pvParameters);
 
+TaskHandle_t baroTaskHandle = NULL;
+TaskHandle_t accelTaskHandle = NULL;
+TaskHandle_t gpsTaskHandle = NULL;
+TaskHandle_t displayTaskHandle = NULL;
+
 void setup() {
     Serial.begin(115200);
+    Serial.println("DEBUG: Serial.begin called");
+    while (!Serial) { delay(10); }
+    Serial.println("DEBUG: Serial connection established");
+    delay(1000); // Give time for USB CDC to initialize
+    Serial.println("DEBUG: Post USB CDC delay");
 
-    // Create display queue
     displayQueue = xQueueCreate(10, sizeof(DisplayData_t));
+    Serial.println("DEBUG: displayQueue created");
     barometerQueue = xQueueCreate(10, sizeof(BaroData_t));
+    Serial.println("DEBUG: barometerQueue created");
     accelQueue = xQueueCreate(10, sizeof(AccelData_t));
+    Serial.println("DEBUG: accelQueue created");
     gpsQueue = xQueueCreate(10, sizeof(GPSData_t));
+    Serial.println("DEBUG: gpsQueue created");
 
-    // Create sensor tasks, pass displayQueue to each
-    xTaskCreate(taskBarometer, "Baro", 1024, (void*)barometerQueue, 2, NULL);
-    vTaskCoreAffinitySet((TaskHandle_t) taskBarometer,0x01); // Set barometer task to core 0
-    xTaskCreate(taskAccelerometer, "Accel", 1024, (void*)accelQueue, 2, NULL);
-    vTaskCoreAffinitySet((TaskHandle_t) taskAccelerometer,0x01); // Set Accelerometer task to core 0
-    xTaskCreate(taskGPS, "GPS", 1024, (void*)gpsQueue, 2, NULL);
-    vTaskCoreAffinitySet((TaskHandle_t) taskGPS,0x01); // Set GPS task to core 0
+    Serial.println("DEBUG: Creating tasks...");
+    xTaskCreate(taskBarometer, "Baro", 1024, (void*)barometerQueue, 2, &baroTaskHandle);
+    Serial.println("DEBUG: taskBarometer created");
+    xTaskCreate(taskAccelerometer, "Accel", 1024, (void*)accelQueue, 2, &accelTaskHandle);
+    Serial.println("DEBUG: taskAccelerometer created");
+    xTaskCreate(taskGPS, "GPS", 1024, (void*)gpsQueue, 2, &gpsTaskHandle);
+    Serial.println("DEBUG: taskGPS created");
+    xTaskCreate(taskDisplay, "Display", 2048, displayQueue, 1, &displayTaskHandle);
+    Serial.println("DEBUG: taskDisplay created");
 
-    // Create display task (core 1)
-    xTaskCreate(taskDisplay, "Display", 2048, displayQueue, 1, NULL);
-    vTaskCoreAffinitySet((TaskHandle_t) taskDisplay,0x02); // Set barometer task to core 0
+    vTaskCoreAffinitySet(baroTaskHandle, 0x01);
+    vTaskCoreAffinitySet(accelTaskHandle, 0x01);
+    vTaskCoreAffinitySet(gpsTaskHandle, 0x01);
+    vTaskCoreAffinitySet(displayTaskHandle, 0x02);
+
+    serialMutex = xSemaphoreCreateMutex();
+    if (serialMutex == NULL) {
+        Serial.println("ERROR: Failed to create serial mutex!");
+        while (1) { delay(1000); }
+    }
+
+    Serial.println("DEBUG: setup() complete");
+
+    vTaskStartScheduler();
 }
 
 void loop() {
