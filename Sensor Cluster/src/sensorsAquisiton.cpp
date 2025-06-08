@@ -1,3 +1,37 @@
+// Connect VCC of the BMP085 sensor to 3.3V (NOT 5.0V!)
+// Connect GND to Ground
+// Connect SCL to i2c clock - on '168/'328 Arduino Uno/Duemilanove/etc thats Analog 5
+// Connect SDA to i2c data - on '168/'328 Arduino Uno/Duemilanove/etc thats Analog 4
+// EOC is not used, it signifies an end of conversion
+// XCLR is a reset pin, also not used here
+
+
+/*                                  |
+//                                  |
+//                             _____|_____
+//                             \         /
+//                              \       / 
+//                               \     /
+//                                \   / 
+//                                 \ /
+//                                  V
+//****************************************************************************
+//PLUG SCL INTO GP5 AND SDA INTO GP4 ON PI PICO!!!!!!!!!!!!!!
+//****************************************************************************
+//                                  ^
+//                                 / \
+//                                /   \
+//                               /     \
+//                              /       \
+//                             /         \ 
+//                             -----------
+//                                  |
+//                                  |
+//                                  |
+*/
+
+
+
 #include "sensorAquisition.h"
 #include <Arduino.h>
 #include <SFE_BMP180.h>
@@ -15,7 +49,7 @@ void taskBarometer(void *pvParameters) {
     Serial.begin(9600);
 	  while (!bmp.begin()) {
         Serial.println("Could not find a valid BMP085 sensor, check wiring!");
-        delay(500);
+        osdelay(500);
         if (bmp.begin()){
             break;
             }
@@ -54,7 +88,6 @@ void taskBarometer(void *pvParameters) {
     Serial.println(" meters");
     
     Serial.println();
-    delay(500);
     }
 
 void taskGPS(void *pvParameters) {
