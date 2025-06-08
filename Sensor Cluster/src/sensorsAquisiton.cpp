@@ -66,16 +66,12 @@ void taskBarometer(void *pvParameters) {
         msg.type = SENSOR_BARO;
         msg.data.baro = baroData;
 
-        if (xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100)) == pdPASS) {
-            xSemaphoreTake(serialMutex, portMAX_DELAY);
-            Serial.println("Barometer: Sent to displayQueue");
-            xSemaphoreGive(serialMutex);
-        } else {
+        if (xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100)) != pdPASS) {
             xSemaphoreTake(serialMutex, portMAX_DELAY);
             Serial.println("Barometer: Failed to send to displayQueue");
             xSemaphoreGive(serialMutex);
         }
-        vTaskDelay(pdMS_TO_TICKS(20)); // Add small delay to allow display task to run
+        vTaskDelay(pdMS_TO_TICKS(20)); // Always yield after send
         vTaskDelay(pdMS_TO_TICKS(500)); // Adjust delay as per desired sampling rate
     }
 }
@@ -131,16 +127,12 @@ void taskGPS(void *pvParameters) {
                 msg.type = SENSOR_GPS;
                 msg.data.gps = gpsData;
 
-                if (xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100)) == pdPASS) {
-                    xSemaphoreTake(serialMutex, portMAX_DELAY);
-                    Serial.println("GPS: Sent to displayQueue");
-                    xSemaphoreGive(serialMutex);
-                } else {
+                if (xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100)) != pdPASS) {
                     xSemaphoreTake(serialMutex, portMAX_DELAY);
                     Serial.println("GPS: Failed to send to displayQueue");
                     xSemaphoreGive(serialMutex);
                 }
-                vTaskDelay(pdMS_TO_TICKS(20)); // Add small delay to allow display task to run
+                vTaskDelay(pdMS_TO_TICKS(20)); // Always yield after send
             }
         }
         vTaskDelay(pdMS_TO_TICKS(50)); // Poll GPS serial buffer frequently
@@ -199,12 +191,11 @@ void taskAccelerometer(void *pvParameters) {
         msg.data.accel = accelData;
 
         if (xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100)) != pdPASS) {
-            // Optional: Log queue send failure
+            xSemaphoreTake(serialMutex, portMAX_DELAY);
+            Serial.println("Accelerometer: Failed to send to displayQueue");
+            xSemaphoreGive(serialMutex);
         }
-        xSemaphoreTake(serialMutex, portMAX_DELAY);
-        Serial.println("Accelerometer: Sent to displayQueue");
-        xSemaphoreGive(serialMutex);
-        vTaskDelay(pdMS_TO_TICKS(20)); // Add small delay to allow display task to run
+        vTaskDelay(pdMS_TO_TICKS(20)); // Always yield after send
         vTaskDelay(pdMS_TO_TICKS(100)); 
     }
 }

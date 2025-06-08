@@ -68,7 +68,7 @@ void setup() {
     Serial.println("DEBUG: taskAccelerometer created");
     xTaskCreate(taskGPS, "GPS", 2048, (void*)displayQueue, 2, &gpsTaskHandle);
     Serial.println("DEBUG: taskGPS created");
-    xTaskCreate(taskDisplay, "Display", 2048, (void*)displayQueue, 2, &displayTaskHandle); // Set priority to 2
+    xTaskCreate(taskDisplay, "Display", 2048, (void*)displayQueue, 3, &displayTaskHandle); // Set display task to higher priority
     Serial.println("DEBUG: taskDisplay created");
 
     Serial.println("DEBUG: setup() complete");

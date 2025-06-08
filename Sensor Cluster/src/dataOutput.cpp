@@ -13,9 +13,16 @@ void taskDisplay(void *pvParameters) {
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
     DisplayData_t data;
 
+    // Debug: Confirm display task is running
+    if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
+        Serial.println("DEBUG: taskDisplay running");
+        xSemaphoreGive(serialMutex);
+    }
+
     for (;;) {
-        if (xQueueReceive(displayQueue, &data, portMAX_DELAY) == pdPASS) {
+        if (xQueueReceive(displayQueue, &data, pdMS_TO_TICKS(1000)) == pdPASS) {
             if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
+                Serial.println("DEBUG: taskDisplay received data");
                 switch (data.type) {
                     case SENSOR_BARO:
                         Serial.print("[BARO] P: ");
@@ -44,7 +51,12 @@ void taskDisplay(void *pvParameters) {
                 }
                 xSemaphoreGive(serialMutex);
             }
-            vTaskDelay(pdMS_TO_TICKS(20)); // Add small delay after printing
+            vTaskDelay(pdMS_TO_TICKS(20));
+        } else {
+            if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
+                Serial.println("DEBUG: taskDisplay timed out waiting for queue");
+                xSemaphoreGive(serialMutex);
+            }
         }
     }
 }
