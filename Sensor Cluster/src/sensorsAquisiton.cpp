@@ -19,6 +19,8 @@
 #include "FreeRTOS.h"
 #include <queue.h>
 #include "semphr.h"
+#include "I2Cdev.h"
+
 
 extern SemaphoreHandle_t serialMutex;
 
