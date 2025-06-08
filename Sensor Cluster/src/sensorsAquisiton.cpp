@@ -135,7 +135,7 @@ void taskAccelerometer(void *pvParameters) {
     AccelData_t accelData;
     int16_t ax, ay, az; // Raw accelerometer values
 
-    Wire.begin(); // Ensure Wire is initialized for I2C communication
+    // Wire.begin(); // Ensure Wire is initialized for I2C communication <- REMOVED, moved to setup()
     accel.initialize(); // Initialize ADXL345
 
     int accelInitAttempts = 0;

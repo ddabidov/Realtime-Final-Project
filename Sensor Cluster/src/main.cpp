@@ -4,6 +4,7 @@
 #include "sensorAquisition.h"
 #include "dataOutput.h"
 #include "semphr.h"
+#include <Wire.h> // Added for Wire.begin()
 
 QueueHandle_t displayQueue;
 QueueHandle_t barometerQueue;
@@ -32,6 +33,10 @@ void setup() {
     delay(1000); // Give time for USB CDC to initialize
     Serial.println("DEBUG: Post USB CDC delay");
 
+    Wire.begin(); // Initialize I2C bus
+    Serial.println("DEBUG: Wire.begin() called in setup");
+
+
     // CREATE THE MUTEX FIRST!
     serialMutex = xSemaphoreCreateMutex();
     if (serialMutex == NULL) {
@@ -55,13 +60,8 @@ void setup() {
     Serial.println("DEBUG: taskAccelerometer created");
     xTaskCreate(taskGPS, "GPS", 2048, (void*)displayQueue, 2, &gpsTaskHandle);
     Serial.println("DEBUG: taskGPS created");
-    xTaskCreate(taskDisplay, "Display", 2048, (void*)displayQueue, 1, &displayTaskHandle);
+    xTaskCreate(taskDisplay, "Display", 2048, (void*)displayQueue, 2, &displayTaskHandle); // Set priority to 2
     Serial.println("DEBUG: taskDisplay created");
-
-    vTaskCoreAffinitySet(baroTaskHandle, 0x01);
-    vTaskCoreAffinitySet(accelTaskHandle, 0x01);
-    vTaskCoreAffinitySet(gpsTaskHandle, 0x01);
-    vTaskCoreAffinitySet(displayTaskHandle, 0x02);
 
     Serial.println("DEBUG: setup() complete");
 
