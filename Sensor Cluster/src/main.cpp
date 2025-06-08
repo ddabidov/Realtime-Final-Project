@@ -49,23 +49,26 @@ void setup() {
     Serial.println("DEBUG: gpsQueue created");
 
     Serial.println("DEBUG: Creating tasks...");
-    xTaskCreate(taskBarometer, "Baro", 1024, (void*)barometerQueue, 2, &baroTaskHandle);
+    xTaskCreate(taskBarometer, "Baro", 2048, (void*)displayQueue, 2, &baroTaskHandle);
     Serial.println("DEBUG: taskBarometer created");
-    xTaskCreate(taskAccelerometer, "Accel", 1024, (void*)accelQueue, 2, &accelTaskHandle);
+    xTaskCreate(taskAccelerometer, "Accel", 2048, (void*)displayQueue, 2, &accelTaskHandle);
     Serial.println("DEBUG: taskAccelerometer created");
-    xTaskCreate(taskGPS, "GPS", 1024, (void*)gpsQueue, 2, &gpsTaskHandle);
+    xTaskCreate(taskGPS, "GPS", 2048, (void*)displayQueue, 2, &gpsTaskHandle);
     Serial.println("DEBUG: taskGPS created");
-    //xTaskCreate(taskDisplay, "Display", 2048, displayQueue, 1, &displayTaskHandle);
-    //Serial.println("DEBUG: taskDisplay created");
+    xTaskCreate(taskDisplay, "Display", 2048, (void*)displayQueue, 1, &displayTaskHandle);
+    Serial.println("DEBUG: taskDisplay created");
 
     vTaskCoreAffinitySet(baroTaskHandle, 0x01);
     vTaskCoreAffinitySet(accelTaskHandle, 0x01);
     vTaskCoreAffinitySet(gpsTaskHandle, 0x01);
-    //vTaskCoreAffinitySet(displayTaskHandle, 0x02);
+    vTaskCoreAffinitySet(displayTaskHandle, 0x02);
 
     Serial.println("DEBUG: setup() complete");
 
     vTaskStartScheduler();
+
+    // If the scheduler returns, print an error
+    Serial.println("ERROR: vTaskStartScheduler returned!");
 }
 
 void loop() {

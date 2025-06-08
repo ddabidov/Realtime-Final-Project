@@ -19,6 +19,7 @@
 #include <queue.h>
 #include "semphr.h"
 #include "I2Cdev.h"
+#include "ADXL345.h"
 
 
 extern SemaphoreHandle_t serialMutex;
@@ -32,7 +33,7 @@ void taskBarometer(void *pvParameters) {
 
     BaroData_t baroData;
     Adafruit_BMP085 bmp;
-    QueueHandle_t barometerQueue = (QueueHandle_t)pvParameters;
+    QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
 
     // Barometer initialization loop with debug prints
     int baroInitAttempts = 0;
@@ -41,12 +42,8 @@ void taskBarometer(void *pvParameters) {
         Serial.print("DEBUG: BMP085 init attempt ");
         Serial.println(++baroInitAttempts);
         Serial.println("Could not find a valid BMP085 sensor, check wiring!");
-        if (bmp.begin()){
-            break;
-            }
-        }
         xSemaphoreGive(serialMutex);
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Release mutex before delay!
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
     xSemaphoreTake(serialMutex, portMAX_DELAY);
     Serial.println("DEBUG: BMP085 sensor initialized");
@@ -55,21 +52,22 @@ void taskBarometer(void *pvParameters) {
     while (true) {
         xSemaphoreTake(serialMutex, portMAX_DELAY);
         Serial.println("DEBUG: taskBarometer loop running");
-        Serial.print("Temperature = ");
-        Serial.println(bmp.readTemperature());
         baroData.temperature = bmp.readTemperature();
         baroData.pressure = bmp.readPressure();
         baroData.altitude = bmp.readAltitude();
-        if (xQueueSend(barometerQueue, &baroData, 0) == pdPASS) {
+        DisplayData_t msg;
+        msg.type = SENSOR_BARO;
+        msg.data.baro = baroData;
+        if (xQueueSend(displayQueue, &msg, 0) == pdPASS) {
             Serial.println("DEBUG: Barometer data sent to queue");
         } else {
             Serial.println("DEBUG: Barometer data NOT sent to queue");
         }
         Serial.print("Pressure = ");
-        Serial.print(bmp.readPressure());
+        Serial.print(baroData.pressure);
         Serial.println(" Pa");
         Serial.print("Altitude = ");
-        Serial.print(bmp.readAltitude());
+        Serial.print(baroData.altitude);
         Serial.println(" meters");
         Serial.print("Pressure at sealevel (calculated) = ");
         Serial.print(bmp.readSealevelPressure());
@@ -80,29 +78,6 @@ void taskBarometer(void *pvParameters) {
         Serial.println();
         xSemaphoreGive(serialMutex);
 
-    Serial.print("Pressure = ");
-    Serial.print(bmp.readPressure());
-    Serial.println(" Pa");
-    
-    // Calculate altitude assuming 'standard' barometric
-    // pressure of 1013.25 millibar = 101325 Pascal
-    Serial.print("Altitude = ");
-    Serial.print(bmp.readAltitude());
-    Serial.println(" meters");
-
-    Serial.print("Pressure at sealevel (calculated) = ");
-    Serial.print(bmp.readSealevelPressure());
-    Serial.println(" Pa");
-
-  // you can get a more precise measurement of altitude
-  // if you know the current sea level pressure which will
-  // vary with weather and such. If it is 1015 millibars
-  // that is equal to 101500 Pascals.
-    Serial.print("Real altitude = ");
-    Serial.print(bmp.readAltitude(101500));
-    Serial.println(" meters");
-    
-    Serial.println();
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
@@ -207,6 +182,19 @@ void taskGPS(void *pvParameters) {
                 Serial.println("DEBUG: GPS data parsed");
                 xSemaphoreGive(serialMutex);
                 displayInfo();
+                // Send GPS data to displayQueue
+                DisplayData_t msg;
+                msg.type = SENSOR_GPS;
+                msg.data.gps.latitude = gps.location.isValid() ? gps.location.lat() : 0.0;
+                msg.data.gps.longitude = gps.location.isValid() ? gps.location.lng() : 0.0;
+                msg.data.gps.altitude = gps.altitude.isValid() ? gps.altitude.meters() : 0.0;
+                xSemaphoreTake(serialMutex, portMAX_DELAY);
+                if (xQueueSend(displayQueue, &msg, 0) == pdPASS) {
+                    Serial.println("DEBUG: GPS data sent to queue");
+                } else {
+                    Serial.println("DEBUG: GPS data NOT sent to queue");
+                }
+                xSemaphoreGive(serialMutex);
             }
         }
 
@@ -233,23 +221,21 @@ void taskAccelerometer(void *pvParameters) {
 
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
     ADXL345 accel;
-    sensors_event_t event;
-
-    // Accelerometer initialization loop with debug prints
     int accelInitAttempts = 0;
-    while (!accel.begin()) {
+
+    Wire.begin();
+    accel.initialize();
+
+    while (!accel.testConnection()) {
         xSemaphoreTake(serialMutex, portMAX_DELAY);
-        Wire.begin();
-        accel.initialize();
-        if(accel.testConnection()){
-            break;
-        } 
         Serial.print("DEBUG: ADXL345 init attempt ");
         Serial.println(++accelInitAttempts);
         Serial.println("Failed to initialize ADXL345! Check wiring.");
         xSemaphoreGive(serialMutex);
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Release mutex before delay!
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        accel.initialize(); // Try again
     }
+
     xSemaphoreTake(serialMutex, portMAX_DELAY);
     Serial.println("DEBUG: ADXL345 sensor initialized");
     xSemaphoreGive(serialMutex);

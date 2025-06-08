@@ -7,6 +7,7 @@
 #include <TinyGPSPlus.h>   
 #include <Adafruit_Sensor.h>
 #include "I2Cdev.h"
+#include "ADXL345.h"
 #include "FreeRTOS.h"
 
 
