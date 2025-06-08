@@ -10,27 +10,12 @@ extern SemaphoreHandle_t serialMutex;
 
 // Display task: handles any sensor data received
 void taskDisplay(void *pvParameters) {
-    if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
-        Serial.println("DEBUG: taskDisplay entered main function.");
-        xSemaphoreGive(serialMutex);
-    }
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
     DisplayData_t data;
 
-    if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
-        Serial.println("DEBUG: taskDisplay started and running.");
-        xSemaphoreGive(serialMutex);
-    }
-
     for (;;) {
-        if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
-            Serial.println("DEBUG: taskDisplay waiting for queue data...");
-            xSemaphoreGive(serialMutex);
-        }
-
         if (xQueueReceive(displayQueue, &data, portMAX_DELAY) == pdPASS) {
             if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
-                Serial.println("DEBUG: taskDisplay received data, processing...");
                 switch (data.type) {
                     case SENSOR_BARO:
                         Serial.print("[BARO] P: ");
@@ -59,11 +44,7 @@ void taskDisplay(void *pvParameters) {
                 }
                 xSemaphoreGive(serialMutex);
             }
-        } else {
-            if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
-                Serial.println("DEBUG: taskDisplay failed to receive data from queue."); // Should not happen with portMAX_DELAY unless queue is deleted
-                xSemaphoreGive(serialMutex);
-            }
+            vTaskDelay(pdMS_TO_TICKS(20)); // Add small delay after printing
         }
     }
 }

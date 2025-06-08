@@ -12,7 +12,8 @@ QueueHandle_t accelQueue;
 QueueHandle_t gpsQueue;
 // Sensor data structures
 
-SemaphoreHandle_t serialMutex; // Add this line
+SemaphoreHandle_t serialMutex; // For serial prints
+SemaphoreHandle_t i2cMutex;    // For I2C bus access
 
 // Forward declarations
 void taskBarometer(void *pvParameters);
@@ -36,15 +37,22 @@ void setup() {
     Wire.begin(); // Initialize I2C bus
     Serial.println("DEBUG: Wire.begin() called in setup");
 
-
     // CREATE THE MUTEX FIRST!
     serialMutex = xSemaphoreCreateMutex();
     if (serialMutex == NULL) {
         Serial.println("ERROR: Failed to create serial mutex!");
         while (1) { delay(1000); }
     }
+    i2cMutex = xSemaphoreCreateMutex();
+    if (i2cMutex == NULL) {
+        Serial.println("ERROR: Failed to create i2c mutex!");
+        while (1) { delay(1000); }
+    }
 
-    displayQueue = xQueueCreate(10, sizeof(DisplayData_t));
+    // Run I2C scan before creating tasks
+    i2cScan();
+
+    displayQueue = xQueueCreate(20, sizeof(DisplayData_t));
     Serial.println("DEBUG: displayQueue created");
     barometerQueue = xQueueCreate(10, sizeof(BaroData_t));
     Serial.println("DEBUG: barometerQueue created");
@@ -73,6 +81,12 @@ void setup() {
 
 void loop() {
     // Not used with FreeRTOS
+}
+
+extern "C" void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
+    Serial.print("*** Stack overflow in task: ");
+    Serial.println(pcTaskName);
+    while (1) { delay(1000); }
 }
 
 

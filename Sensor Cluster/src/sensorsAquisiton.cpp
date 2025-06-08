@@ -23,6 +23,7 @@
 
 
 extern SemaphoreHandle_t serialMutex;
+extern SemaphoreHandle_t i2cMutex;
 
 void taskBarometer(void *pvParameters) {
     xSemaphoreTake(serialMutex, portMAX_DELAY);
@@ -34,21 +35,29 @@ void taskBarometer(void *pvParameters) {
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
 
     int baroInitAttempts = 0;
-    while (!bmp.begin()) {
-        xSemaphoreTake(serialMutex, portMAX_DELAY); // Added missing semaphore take
-        Serial.print("DEBUG: BMP085 init attempt ");
-        Serial.println(++baroInitAttempts);
-        Serial.println("Could not find a valid BMP085 sensor, check wiring!");
-        xSemaphoreGive(serialMutex);
-        vTaskDelay(pdMS_TO_TICKS(1000));
+    bool baroInit = false;
+    while (!baroInit) {
+        xSemaphoreTake(i2cMutex, portMAX_DELAY);
+        baroInit = bmp.begin();
+        xSemaphoreGive(i2cMutex);
+        if (!baroInit) {
+            xSemaphoreTake(serialMutex, portMAX_DELAY);
+            Serial.print("DEBUG: BMP085 init attempt ");
+            Serial.println(++baroInitAttempts);
+            Serial.println("Could not find a valid BMP085 sensor, check wiring!");
+            xSemaphoreGive(serialMutex);
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
     }
     xSemaphoreTake(serialMutex, portMAX_DELAY);
     Serial.println("DEBUG: BMP085 sensor initialized");
     xSemaphoreGive(serialMutex);
 
     while (true) {
+        xSemaphoreTake(i2cMutex, portMAX_DELAY);
         baroData.temperature = bmp.readTemperature();
         baroData.pressure = bmp.readPressure();
+        xSemaphoreGive(i2cMutex);
         // Altitude calculation is often less critical for raw data logging,
         // but can be included if needed by taskDisplay.
         // baroData.altitude = bmp.readAltitude(); // Uncomment if altitude is needed
@@ -57,10 +66,16 @@ void taskBarometer(void *pvParameters) {
         msg.type = SENSOR_BARO;
         msg.data.baro = baroData;
 
-        if (xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100)) != pdPASS) {
-            // Optional: Log queue send failure (e.g., increment a counter)
-            // Avoid Serial.print here to prevent re-introducing contention
+        if (xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100)) == pdPASS) {
+            xSemaphoreTake(serialMutex, portMAX_DELAY);
+            Serial.println("Barometer: Sent to displayQueue");
+            xSemaphoreGive(serialMutex);
+        } else {
+            xSemaphoreTake(serialMutex, portMAX_DELAY);
+            Serial.println("Barometer: Failed to send to displayQueue");
+            xSemaphoreGive(serialMutex);
         }
+        vTaskDelay(pdMS_TO_TICKS(20)); // Add small delay to allow display task to run
         vTaskDelay(pdMS_TO_TICKS(500)); // Adjust delay as per desired sampling rate
     }
 }
@@ -116,9 +131,16 @@ void taskGPS(void *pvParameters) {
                 msg.type = SENSOR_GPS;
                 msg.data.gps = gpsData;
 
-                if (xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100)) != pdPASS) {
-                    // Optional: Log queue send failure
+                if (xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100)) == pdPASS) {
+                    xSemaphoreTake(serialMutex, portMAX_DELAY);
+                    Serial.println("GPS: Sent to displayQueue");
+                    xSemaphoreGive(serialMutex);
+                } else {
+                    xSemaphoreTake(serialMutex, portMAX_DELAY);
+                    Serial.println("GPS: Failed to send to displayQueue");
+                    xSemaphoreGive(serialMutex);
                 }
+                vTaskDelay(pdMS_TO_TICKS(20)); // Add small delay to allow display task to run
             }
         }
         vTaskDelay(pdMS_TO_TICKS(50)); // Poll GPS serial buffer frequently
@@ -135,20 +157,22 @@ void taskAccelerometer(void *pvParameters) {
     AccelData_t accelData;
     int16_t ax, ay, az; // Raw accelerometer values
 
-    // Wire.begin(); // Ensure Wire is initialized for I2C communication <- REMOVED, moved to setup()
-    accel.initialize(); // Initialize ADXL345
-
     int accelInitAttempts = 0;
-    while (!accel.testConnection()) {
-        xSemaphoreTake(serialMutex, portMAX_DELAY);
-        Serial.print("DEBUG: ADXL345 init attempt ");
-        Serial.println(++accelInitAttempts);
-        Serial.println("ADXL345 connection failed!");
-        xSemaphoreGive(serialMutex);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        // accel.initialize(); // Optionally re-attempt initialization
+    bool accelInit = false;
+    while (!accelInit) {
+        xSemaphoreTake(i2cMutex, portMAX_DELAY);
+        accel.initialize();
+        accelInit = accel.testConnection();
+        xSemaphoreGive(i2cMutex);
+        if (!accelInit) {
+            xSemaphoreTake(serialMutex, portMAX_DELAY);
+            Serial.print("DEBUG: ADXL345 init attempt ");
+            Serial.println(++accelInitAttempts);
+            Serial.println("ADXL345 connection failed!");
+            xSemaphoreGive(serialMutex);
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
     }
-
     xSemaphoreTake(serialMutex, portMAX_DELAY);
     Serial.println("DEBUG: ADXL345 sensor initialized");
     xSemaphoreGive(serialMutex);
@@ -156,7 +180,15 @@ void taskAccelerometer(void *pvParameters) {
     const float scaleFactor = 1.0f / 256.0f; 
 
     while (true) {
-        accel.getAcceleration(&ax, &ay, &az); 
+        xSemaphoreTake(i2cMutex, portMAX_DELAY);
+        accel.getAcceleration(&ax, &ay, &az);
+        xSemaphoreGive(i2cMutex);
+
+        xSemaphoreTake(serialMutex, portMAX_DELAY);
+        Serial.print("RAW ACCEL: x="); Serial.print(ax);
+        Serial.print(" y="); Serial.print(ay);
+        Serial.print(" z="); Serial.println(az);
+        xSemaphoreGive(serialMutex);
 
         accelData.x = ax * scaleFactor;
         accelData.y = ay * scaleFactor;
@@ -169,10 +201,28 @@ void taskAccelerometer(void *pvParameters) {
         if (xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100)) != pdPASS) {
             // Optional: Log queue send failure
         }
+        xSemaphoreTake(serialMutex, portMAX_DELAY);
+        Serial.println("Accelerometer: Sent to displayQueue");
+        xSemaphoreGive(serialMutex);
+        vTaskDelay(pdMS_TO_TICKS(20)); // Add small delay to allow display task to run
         vTaskDelay(pdMS_TO_TICKS(100)); 
     }
 }
 
 void i2cScan() {
-    // ...existing code...
+    xSemaphoreTake(serialMutex, portMAX_DELAY);
+    Serial.println("I2C scan start...");
+    xSemaphoreGive(serialMutex);
+    for (uint8_t addr = 1; addr < 127; ++addr) {
+        Wire.beginTransmission(addr);
+        if (Wire.endTransmission() == 0) {
+            xSemaphoreTake(serialMutex, portMAX_DELAY);
+            Serial.print("Found I2C device at 0x");
+            Serial.println(addr, HEX);
+            xSemaphoreGive(serialMutex);
+        }
+    }
+    xSemaphoreTake(serialMutex, portMAX_DELAY);
+    Serial.println("I2C scan complete.");
+    xSemaphoreGive(serialMutex);
 }
