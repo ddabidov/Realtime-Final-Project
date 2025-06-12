@@ -23,11 +23,21 @@ void taskDisplay(void *pvParameters) {
     }
 
     for (;;) {
+        // Heartbeat: print every 2 seconds to show display task is alive
+        static unsigned long lastHeartbeat = 0;
+        if (millis() - lastHeartbeat > 2000) {
+            if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
+                Serial.println("[HEARTBEAT] Display task alive");
+                xSemaphoreGive(serialMutex);
+            }
+            lastHeartbeat = millis();
+        }
+
         if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
             Serial.println("DEBUG: taskDisplay waiting for queue data...");
             xSemaphoreGive(serialMutex);
         }
-
+        
         if (xQueueReceive(displayQueue, &data, portMAX_DELAY) == pdPASS) {
             if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
                 Serial.println("DEBUG: taskDisplay received data, processing...");

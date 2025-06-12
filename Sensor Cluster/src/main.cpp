@@ -15,15 +15,15 @@ QueueHandle_t gpsQueue;
 SemaphoreHandle_t serialMutex; // Add this line
 
 // Forward declarations
+// void taskDisplay(void *pvParameters); // Commented out display task
 void taskBarometer(void *pvParameters);
 void taskAccelerometer(void *pvParameters);
 void taskGPS(void *pvParameters);
-void taskDisplay(void *pvParameters);
 
 TaskHandle_t baroTaskHandle = NULL;
 TaskHandle_t accelTaskHandle = NULL;
 TaskHandle_t gpsTaskHandle = NULL;
-TaskHandle_t displayTaskHandle = NULL;
+// TaskHandle_t displayTaskHandle = NULL; // Commented out display task
 
 void setup() {
     Serial.begin(115200);
@@ -54,21 +54,36 @@ void setup() {
     Serial.println("DEBUG: gpsQueue created");
 
     Serial.println("DEBUG: Creating tasks...");
-    xTaskCreate(taskBarometer, "Baro", 2048, (void*)displayQueue, 2, &baroTaskHandle);
+    // xTaskCreate(taskDisplay, "Display", 4096, (void*)displayQueue, 3, &displayTaskHandle); // Commented out display task
+    xTaskCreate(taskBarometer, "Baro", 2048, NULL, 2, &baroTaskHandle);
     Serial.println("DEBUG: taskBarometer created");
-    xTaskCreate(taskAccelerometer, "Accel", 2048, (void*)displayQueue, 2, &accelTaskHandle);
+    xTaskCreate(taskAccelerometer, "Accel", 2048, NULL, 2, &accelTaskHandle);
     Serial.println("DEBUG: taskAccelerometer created");
-    xTaskCreate(taskGPS, "GPS", 2048, (void*)displayQueue, 2, &gpsTaskHandle);
+    xTaskCreate(taskGPS, "GPS", 2048, NULL, 2, &gpsTaskHandle);
     Serial.println("DEBUG: taskGPS created");
-    xTaskCreate(taskDisplay, "Display", 2048, (void*)displayQueue, 2, &displayTaskHandle); // Set priority to 2
-    Serial.println("DEBUG: taskDisplay created");
 
     Serial.println("DEBUG: setup() complete");
 
     vTaskStartScheduler();
+    // If we ever get here, scheduler failed to start or returned
+    Serial.println("[FATAL] vTaskStartScheduler() returned! System halted.");
+    for (;;) {}
+}
 
-    // If the scheduler returns, print an error
-    Serial.println("ERROR: vTaskStartScheduler returned!");
+// FreeRTOS stack overflow hook
+extern "C" void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
+    Serial.print("ERROR: Stack overflow in task: ");
+    Serial.println(pcTaskName);
+    while (1) { delay(1000); }
+}
+
+// FreeRTOS idle hook
+extern "C" void vApplicationIdleHook(void) {
+    static uint32_t lastPrint = 0;
+    if (millis() - lastPrint > 2000) {
+        Serial.println("DEBUG: Idle task running");
+        lastPrint = millis();
+    }
 }
 
 void loop() {

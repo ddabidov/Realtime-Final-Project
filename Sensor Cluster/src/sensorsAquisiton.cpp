@@ -31,35 +31,43 @@ void taskBarometer(void *pvParameters) {
 
     BaroData_t baroData;
     Adafruit_BMP085 bmp;
-    QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
+    // QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
 
     int baroInitAttempts = 0;
     while (!bmp.begin()) {
-        xSemaphoreTake(serialMutex, portMAX_DELAY); // Added missing semaphore take
-        Serial.print("DEBUG: BMP085 init attempt ");
-        Serial.println(++baroInitAttempts);
-        Serial.println("Could not find a valid BMP085 sensor, check wiring!");
-        xSemaphoreGive(serialMutex);
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
+            Serial.println("[ERROR] BMP085 not detected. Barometer task waiting...");
+            xSemaphoreGive(serialMutex);
+        }
+        vTaskDelay(pdMS_TO_TICKS(2000));
     }
-    xSemaphoreTake(serialMutex, portMAX_DELAY);
-    Serial.println("DEBUG: BMP085 sensor initialized");
-    xSemaphoreGive(serialMutex);
+    if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
+        Serial.println("[INFO] BMP085 detected. Barometer task running.");
+        xSemaphoreGive(serialMutex);
+    }
+    for (;;) {
+        // Heartbeat: print every 2 seconds to show barometer task is alive
+        static unsigned long lastHeartbeat = 0;
+        if (millis() - lastHeartbeat > 2000) {
+            if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
+                Serial.println("[HEARTBEAT] Barometer task alive");
+                xSemaphoreGive(serialMutex);
+            }
+            lastHeartbeat = millis();
+        }
 
-    while (true) {
         baroData.temperature = bmp.readTemperature();
         baroData.pressure = bmp.readPressure();
         // Altitude calculation is often less critical for raw data logging,
         // but can be included if needed by taskDisplay.
         // baroData.altitude = bmp.readAltitude(); // Uncomment if altitude is needed
 
-        DisplayData_t msg;
-        msg.type = SENSOR_BARO;
-        msg.data.baro = baroData;
-
-        if (xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100)) != pdPASS) {
-            // Optional: Log queue send failure (e.g., increment a counter)
-            // Avoid Serial.print here to prevent re-introducing contention
+        if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
+            Serial.print("[BARO] P: ");
+            Serial.print(baroData.pressure);
+            Serial.print(" T: ");
+            Serial.println(baroData.temperature);
+            xSemaphoreGive(serialMutex);
         }
         vTaskDelay(pdMS_TO_TICKS(500)); // Adjust delay as per desired sampling rate
     }
@@ -93,13 +101,17 @@ void taskGPS(void *pvParameters) {
     Serial.println("DEBUG: GPS Serial configured for taskGPS");
     xSemaphoreGive(serialMutex);
 
-    while (true) {
+    for (;;) {
         bool sentenceProcessedThisPass = false;
-        while (gpsSerial.available() > 0) {
-            if (gps.encode(gpsSerial.read())) { // True if a new NMEA sentence is complete
+        int bytesProcessed = 0;
+        while (gpsSerial.available() > 0 && bytesProcessed < 128) { // Limit bytes per loop
+            if (gps.encode(gpsSerial.read())) {
                 sentenceProcessedThisPass = true;
             }
+            bytesProcessed++;
         }
+        // Always yield, even if no data
+        vTaskDelay(pdMS_TO_TICKS(20));
 
         if (sentenceProcessedThisPass) {
             if (gps.location.isUpdated() && gps.location.isValid()) {
@@ -112,12 +124,14 @@ void taskGPS(void *pvParameters) {
                     gpsData.altitude = gps.altitude.isValid() ? gps.altitude.meters() : 0.0; 
                 }
 
-                DisplayData_t msg;
-                msg.type = SENSOR_GPS;
-                msg.data.gps = gpsData;
-
-                if (xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100)) != pdPASS) {
-                    // Optional: Log queue send failure
+                if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
+                    Serial.print("[GPS] Lat: ");
+                    Serial.print(gpsData.latitude, 6);
+                    Serial.print(" Lon: ");
+                    Serial.print(gpsData.longitude, 6);
+                    Serial.print(" Alt: ");
+                    Serial.println(gpsData.altitude, 2);
+                    xSemaphoreGive(serialMutex);
                 }
             }
         }
@@ -140,13 +154,15 @@ void taskAccelerometer(void *pvParameters) {
 
     int accelInitAttempts = 0;
     while (!accel.testConnection()) {
-        xSemaphoreTake(serialMutex, portMAX_DELAY);
-        Serial.print("DEBUG: ADXL345 init attempt ");
-        Serial.println(++accelInitAttempts);
-        Serial.println("ADXL345 connection failed!");
-        xSemaphoreGive(serialMutex);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        // accel.initialize(); // Optionally re-attempt initialization
+        if (accelInitAttempts % 10 == 0) { // Only print every 10 attempts
+            xSemaphoreTake(serialMutex, portMAX_DELAY);
+            Serial.print("DEBUG: ADXL345 init attempt ");
+            Serial.println(accelInitAttempts);
+            Serial.println("ADXL345 connection failed!");
+            xSemaphoreGive(serialMutex);
+        }
+        accelInitAttempts++;
+        vTaskDelay(pdMS_TO_TICKS(500)); // Always yield!
     }
 
     xSemaphoreTake(serialMutex, portMAX_DELAY);
@@ -162,12 +178,14 @@ void taskAccelerometer(void *pvParameters) {
         accelData.y = ay * scaleFactor;
         accelData.z = az * scaleFactor;
 
-        DisplayData_t msg;
-        msg.type = SENSOR_ACCEL;
-        msg.data.accel = accelData;
-
-        if (xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100)) != pdPASS) {
-            // Optional: Log queue send failure
+        if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
+            Serial.print("[ACCEL] X: ");
+            Serial.print(accelData.x);
+            Serial.print(" Y: ");
+            Serial.print(accelData.y);
+            Serial.print(" Z: ");
+            Serial.println(accelData.z);
+            xSemaphoreGive(serialMutex);
         }
         vTaskDelay(pdMS_TO_TICKS(100)); 
     }
