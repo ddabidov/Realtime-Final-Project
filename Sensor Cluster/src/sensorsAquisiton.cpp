@@ -108,10 +108,6 @@ void i2cScan(void) {
     // Stub implementation for linker
 }
 
-void taskGPS(void *pvParameters) {
-    // Stub implementation for linker
-    for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 

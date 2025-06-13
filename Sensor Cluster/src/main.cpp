@@ -12,15 +12,15 @@ QueueHandle_t gpsQueue;
 // Sensor data structures
 
 // Forward declarations
-// void taskDisplay(void *pvParameters); // Commented out display task
 void taskBarometer(void *pvParameters);
 void taskAccelerometer(void *pvParameters);
 void taskGPS(void *pvParameters);
+void taskDisplay(void *pvParameters);
 
 TaskHandle_t baroTaskHandle = NULL;
 TaskHandle_t accelTaskHandle = NULL;
 TaskHandle_t gpsTaskHandle = NULL;
-TaskHandle_t displayTaskHandle = NULL; // Declare displayTaskHandle
+TaskHandle_t displayTaskHandle = NULL;
 
 void setup() {
     Serial.begin(115200);
@@ -48,12 +48,15 @@ void setup() {
 
     Serial.println("DEBUG: Creating tasks...");
     xTaskCreate(taskBarometer, "Baro", 2048, (void*)displayQueue, 2, &baroTaskHandle);
+    xTaskCreate(taskBarometer, "Baro", 2048, (void*)displayQueue, 2, &baroTaskHandle);
     Serial.println("DEBUG: taskBarometer created");
+    xTaskCreate(taskAccelerometer, "Accel", 2048, (void*)displayQueue, 2, &accelTaskHandle);
     xTaskCreate(taskAccelerometer, "Accel", 2048, (void*)displayQueue, 2, &accelTaskHandle);
     Serial.println("DEBUG: taskAccelerometer created");
     xTaskCreate(taskGPS, "GPS", 2048, (void*)displayQueue, 2, &gpsTaskHandle);
+    xTaskCreate(taskGPS, "GPS", 2048, (void*)displayQueue, 2, &gpsTaskHandle);
     Serial.println("DEBUG: taskGPS created");
-    xTaskCreate(taskDisplay, "Display", 2048, (void*)displayQueue, 3, &displayTaskHandle); // Set display task to higher priority
+    xTaskCreate(taskDisplay, "Display", 4096, (void*)displayQueue, 3, &displayTaskHandle); // Increased stack size
     Serial.println("DEBUG: taskDisplay created");
 
     Serial.println("DEBUG: setup() complete");
