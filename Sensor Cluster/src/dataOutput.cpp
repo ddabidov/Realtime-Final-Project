@@ -43,13 +43,17 @@ void taskDisplay(void *pvParameters) {
                 Serial.println("DEBUG: taskDisplay received data, processing...");
                 switch (data.type) {
                     case SENSOR_BARO:
-                        Serial.print("[BARO] P: ");
+                        Serial.print("[BARO] t=");
+                        Serial.print(data.msSinceStart);
+                        Serial.print("ms P: ");
                         Serial.print(data.data.baro.pressure);
                         Serial.print(" T: ");
                         Serial.println(data.data.baro.temperature);
                         break;
                     case SENSOR_ACCEL:
-                        Serial.print("[ACCEL] X: ");
+                        Serial.print("[ACCEL] t=");
+                        Serial.print(data.msSinceStart);
+                        Serial.print("ms X: ");
                         Serial.print(data.data.accel.x);
                         Serial.print(" Y: ");
                         Serial.print(data.data.accel.y);
