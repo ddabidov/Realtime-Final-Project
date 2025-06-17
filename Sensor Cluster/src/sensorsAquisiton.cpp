@@ -42,17 +42,23 @@ void taskBarometer(void *pvParameters) {
         }
     }
     for (;;) {
+        Serial.println("DEBUG: Barometer loop start");
         // Heartbeat: print every 2 seconds to show barometer task is alive
         static unsigned long lastHeartbeat = 0;
         if (millis() - lastHeartbeat > 2000) {
             Serial.println("[HEARTBEAT] Barometer task alive");
             lastHeartbeat = millis();
         }
-
+        Serial.println("DEBUG: Barometer about to read temperature");
         baroData.temperature = bmp.readTemperature();
+        Serial.println("DEBUG: Barometer finished reading temperature");
+        Serial.println("DEBUG: Barometer about to read pressure");
         baroData.pressure = bmp.readPressure();
+        Serial.println("DEBUG: Barometer finished reading pressure");
+        Serial.println("DEBUG: Barometer about to read altitude");
         baroData.altitude = bmp.readAltitude();
-
+        Serial.println("DEBUG: Barometer finished reading altitude");
+        Serial.println("DEBUG: Barometer about to send to displayQueue");
         DisplayData_t msg;
         msg.type = SENSOR_BARO;
         msg.data.baro = baroData;
@@ -91,11 +97,15 @@ void taskAccelerometer(void *pvParameters) {
     }
     const float scaleFactor = 1.0f / 256.0f;
     while (true) {
+        Serial.println("DEBUG: Accel loop start");
+        Serial.println("DEBUG: Accel about to read sensors");
+        Serial.println("DEBUG: Accel about to read acceleration");
         accel.getAcceleration(&ax, &ay, &az);
-        accelData.x = ax * scaleFactor;
-        accelData.y = ay * scaleFactor;
-        accelData.z = az * scaleFactor;
-
+        Serial.println("DEBUG: Accel finished reading acceleration");
+        accelData.x = ax * (1.0f / 256.0f);
+        accelData.y = ay * (1.0f / 256.0f);
+        accelData.z = az * (1.0f / 256.0f);
+        Serial.println("DEBUG: Accel about to send to displayQueue");
         DisplayData_t msg;
         msg.type = SENSOR_ACCEL;
         msg.data.accel = accelData;

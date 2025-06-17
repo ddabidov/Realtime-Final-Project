@@ -54,5 +54,6 @@ void taskDisplay(void *pvParameters) {
         } else {
             Serial.println("DEBUG: taskDisplay timed out waiting for queue");
         }
+        vTaskDelay(pdMS_TO_TICKS(1)); // Yield to other tasks
     }
 }
