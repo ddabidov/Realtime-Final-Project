@@ -54,9 +54,9 @@ void setup() {
     Serial.println("DEBUG: gpsQueue created");
 
     Serial.println("DEBUG: Creating tasks...");
-    xTaskCreate(taskBarometer, "Baro", 2048, (void*)displayQueue, 2, &baroTaskHandle);
+    xTaskCreate(taskBarometer, "Baro", 4096, (void*)displayQueue, 2, &baroTaskHandle);
     Serial.println("DEBUG: taskBarometer created");
-    xTaskCreate(taskAccelerometer, "Accel", 2048, (void*)displayQueue, 2, &accelTaskHandle);
+    xTaskCreate(taskAccelerometer, "Accel", 4096, (void*)displayQueue, 2, &accelTaskHandle);
     Serial.println("DEBUG: taskAccelerometer created");
     xTaskCreate(taskGPS, "GPS", 2048, (void*)displayQueue, 2, &gpsTaskHandle);
     Serial.println("DEBUG: taskGPS created");

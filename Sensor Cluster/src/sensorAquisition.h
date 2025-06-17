@@ -49,6 +49,7 @@ typedef struct {
         AccelData_t accel;
         GPSData_t gps;
     } data;
+    unsigned long msSinceStart; // Timestamp in ms since start
 } DisplayData_t;
 
 void taskBarometer(void *pvParameters);
