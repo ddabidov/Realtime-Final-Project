@@ -67,7 +67,12 @@ void taskBarometer(void *pvParameters) {
     }
 }
     
-// void taskGPS(void *pvParameters) { ... } // Commented out GPS task implementation
+void taskGPS(void *pvParameters) {
+    // Stub implementation for linker
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
 
 void taskAccelerometer(void *pvParameters) {
     Serial.println("DEBUG: taskAccelerometer started");
@@ -118,7 +123,6 @@ void i2cScan(void) {
     // Stub implementation for linker
 }
 
-    }
-}
+
 
 

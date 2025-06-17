@@ -4,9 +4,21 @@
 #include "sensorAquisition.h"
 #include "dataOutput.h"
 #include "semphr.h" // Added for serialMutex
+#include <Adafruit_SSD1306.h>
+
+
+Adafruit_SSD1306 display(128, 32, &Wire, -1); // Initialize display with I2C
 
 // Display task: handles any sensor data received
 void taskDisplay(void *pvParameters) {
+    
+    if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+        Serial.println("SSD1306 allocation failed");
+        for(;;); // Halt if display fails
+    }
+    display.clearDisplay(); // Clear the display buffer
+
+    
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
     DisplayData_t data;
 
@@ -24,12 +36,18 @@ void taskDisplay(void *pvParameters) {
         Serial.println("DEBUG: taskDisplay waiting for queue data...");
         if (xQueueReceive(displayQueue, &data, portMAX_DELAY) == pdPASS) {
             Serial.println("DEBUG: taskDisplay received data, processing...");
+
             switch (data.type) {
                 case SENSOR_BARO:
                     Serial.print("[BARO] P: ");
                     Serial.print(data.data.baro.pressure);
                     Serial.print(" T: ");
                     Serial.println(data.data.baro.temperature);
+                    display.setCursor(0, 0);                    //THIS SHIT PRINTS NOTHING AT ALL I AM GOING TO KILL MYSELF
+                    display.setTextSize(1);                     //AND OUR PARTNER IS USELESS LIKE WHAT THE FUCK WHAT
+                    display.setTextColor(SSD1306_WHITE);        //DO YOU MEAN THAT YOU FUCKING CHATGPT'ED THE WHOLE REPORT
+                    display.print(F("[BARO] P: "));             //JSUT FUCKING DO IT YOURSELF YOU TWAT
+                    display.display();                          //Also i did not commit any of this stuff
                     break;
                 case SENSOR_ACCEL:
                     Serial.print("[ACCEL] X: ");

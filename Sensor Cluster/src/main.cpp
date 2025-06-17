@@ -5,6 +5,7 @@
 #include "dataOutput.h"
 #include <Wire.h> // Added for Wire.begin()
 
+
 QueueHandle_t displayQueue;
 QueueHandle_t barometerQueue;
 QueueHandle_t accelQueue;
