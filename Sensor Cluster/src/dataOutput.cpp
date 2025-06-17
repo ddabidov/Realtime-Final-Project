@@ -1,4 +1,4 @@
-#include <Arduino.h>
+/* #include <Arduino.h>
 #include <FreeRTOS.h>  
 #include <queue.h>
 #include "sensorAquisition.h"
@@ -75,3 +75,4 @@ void taskDisplay(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(1)); // Yield to other tasks
     }
 }
+    */

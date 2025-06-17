@@ -17,6 +17,7 @@
 #define gpsSerial Serial1  // Use built-in Serial1 for Pi Pico
 
 
+
 // Enum for sensor data type
 typedef enum {
     SENSOR_BARO,
