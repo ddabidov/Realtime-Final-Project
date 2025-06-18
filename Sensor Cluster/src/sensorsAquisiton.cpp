@@ -24,6 +24,7 @@
 
 
 
+
 void taskBarometer(void *pvParameters) {
     Serial.println("DEBUG: taskBarometer started");
 
@@ -70,7 +71,7 @@ void taskBarometer(void *pvParameters) {
         } else {
             Serial.println("DEBUG: Barometer sent data to displayQueue");
         }
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(250));
     }
 }
     
@@ -98,7 +99,7 @@ void taskAccelerometer(void *pvParameters) {
                 Serial.println("ADXL345 connection failed!");
             }
             accelInitAttempts++;
-            vTaskDelay(pdMS_TO_TICKS(500));
+            vTaskDelay(pdMS_TO_TICKS(50));
             accel.initialize(); // Retry initialization
         }
     }
@@ -123,22 +124,42 @@ void taskAccelerometer(void *pvParameters) {
         } else {
             Serial.println("DEBUG: Accel sent data to displayQueue");
         }
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(250));
     }
 }
 
 
+void oled_display(const DisplayData_t& data) {
+    Adafruit_SSD1306 display(128, 32, &Wire, -1); // Initialize display with I2C
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+    display.clearDisplay(); // Clear the display buffer
+    display.setCursor(0, 0);                    // Set cursor to top-left corner
+    display.setTextSize(1);                     // Set text size to 1   
+    display.setTextColor(SSD1306_WHITE);        // Set text color to white
+    switch (data.type) { 
+        case SENSOR_BARO:
+            display.setCursor(0, 0);
+            display.print(data.data.baro.pressure, 2);
+            display.print(" ");
+            display.print(data.data.baro.temperature, 2);
+            break;
+        case SENSOR_ACCEL:
+            display.setCursor(0, 0);
+            display.print("\n");
+            display.print(data.data.accel.x, 2);
+            display.print(" "); 
+            display.print(data.data.accel.y, 2);
+            break;
+        default:
+            display.setCursor(0, 0);
+            display.print("Unknown sensor data");
+    }
+    display.display();
+}
 
 // Display task: handles any sensor data received
 void taskDisplay(void *pvParameters) {
-    //Adafruit_SSD1306 display(128, 32, &Wire, -1); // Initialize display with I2C
-    //if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    //    Serial.println("SSD1306 allocation failed");
-    //    for(;;); // Halt if display fails
-    //}
-    //display.clearDisplay(); // Clear the display buffer
-
-    
+    Adafruit_SSD1306 display(128, 32, &Wire, -1); // Initialize display with I2C
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
     DisplayData_t data;
 
@@ -151,19 +172,18 @@ void taskDisplay(void *pvParameters) {
     for (;;) {
         Serial.println("DEBUG: taskDisplay waiting for queue data...");
         if (xQueueReceive(displayQueue, &data, portMAX_DELAY) == pdPASS) {
+            //if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+            //    Serial.println("SSD1306 allocation failed");
+            //}
             Serial.println("DEBUG: taskDisplay received data, processing...");
-
+            
             switch (data.type) {
                 case SENSOR_BARO:
                     Serial.print("[BARO] P: ");
                     Serial.print(data.data.baro.pressure);
                     Serial.print(" T: ");
                     Serial.println(data.data.baro.temperature);
-                    //display.setCursor(0, 0);                    //THIS SHIT PRINTS NOTHING AT ALL I AM GOING TO KILL MYSELF
-                    //display.setTextSize(1);                     //AND OUR PARTNER IS USELESS LIKE WHAT THE FUCK WHAT
-                    //display.setTextColor(SSD1306_WHITE);        //DO YOU MEAN THAT YOU FUCKING CHATGPT'ED THE WHOLE REPORT
-                    //display.print(F("[BARO] P: "));             //JSUT FUCKING DO IT YOURSELF YOU TWAT
-                    //display.display();                          //Also i did not commit any of this stuff
+                    oled_display(data);                          //Also i did not commit any of this stuff
                     break;
                 case SENSOR_ACCEL:
                     Serial.print("[ACCEL] X: ");
@@ -172,6 +192,7 @@ void taskDisplay(void *pvParameters) {
                     Serial.print(data.data.accel.y);
                     Serial.print(" Z: ");
                     Serial.println(data.data.accel.z);
+                    oled_display(data);                
                     break;
                 case SENSOR_GPS:
                     Serial.print("[GPS] Lat: ");
@@ -180,6 +201,7 @@ void taskDisplay(void *pvParameters) {
                     Serial.print(data.data.gps.longitude, 6);
                     Serial.print(" Alt: ");
                     Serial.println(data.data.gps.altitude, 2);
+                    
                     break;
                 default:
                     Serial.println("[UNKNOWN SENSOR DATA]");
@@ -187,6 +209,8 @@ void taskDisplay(void *pvParameters) {
         } else {
             Serial.println("DEBUG: taskDisplay timed out waiting for queue");
         }
-        vTaskDelay(pdMS_TO_TICKS(10)); // Yield to other tasks
+        vTaskDelay(pdMS_TO_TICKS(500)); // Yield to other tasks
+        display.clearDisplay(); // Clear the display buffer
+    
     }
 }
