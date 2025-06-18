@@ -25,6 +25,7 @@
 int oled_begin = 0;
 
 float barop, barot, accelx, accely, accelz = 0; // Global variables for accelerometer data
+GPSData_t gpsData;
 
 Adafruit_SSD1306 display(128, 32, &Wire, -1); // Initialize display with I2C
 
@@ -176,7 +177,7 @@ void taskAccelerometer(void *pvParameters) {
 
 
 void oled_display(const DisplayData_t& data) {
-    GPSData_t gps;
+    
     if (oled_begin == 0) {
         if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
             Serial.println("SSD1306 allocation failed");
@@ -198,7 +199,7 @@ void oled_display(const DisplayData_t& data) {
             barot = data.data.baro.temperature;
             break;
         case(SENSOR_GPS):
-            gps = data.data.gps; // Store GPS data in global variables
+            gpsData = data.data.gps; // Store GPS data in global variables
             break;
         }
     display.clearDisplay(); // Clear the display buffer
@@ -219,11 +220,11 @@ void oled_display(const DisplayData_t& data) {
     display.print(accelz); // Print accelerometer data
 
     display.setCursor(0, 20);
-    display.print(gps.latitude, 6); // Print GPS latitude
+    display.print(gpsData.latitude, 6); // Print GPS latitude
     display.print(" ");
-    display.print(gps.longitude, 6); // Print GPS longitude 
+    display.print(gpsData.longitude, 6); // Print GPS longitude 
     display.print(" ");
-    display.print(gps.altitude, 2); // Print GPS altitude
+    display.print(gpsData.altitude, 2); // Print GPS altitude
             
     display.display();
 
