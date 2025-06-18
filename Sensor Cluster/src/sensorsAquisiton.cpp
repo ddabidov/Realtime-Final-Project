@@ -22,7 +22,9 @@
 #include "ADXL345.h"
 #include <Adafruit_SSD1306.h>
 
+int oled_begin = 0;
 
+Adafruit_SSD1306 display(128, 32, &Wire, -1); // Initialize display with I2C
 
 
 void taskBarometer(void *pvParameters) {
@@ -71,7 +73,7 @@ void taskBarometer(void *pvParameters) {
         } else {
             Serial.println("DEBUG: Barometer sent data to displayQueue");
         }
-        vTaskDelay(pdMS_TO_TICKS(250));
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
     
@@ -124,14 +126,21 @@ void taskAccelerometer(void *pvParameters) {
         } else {
             Serial.println("DEBUG: Accel sent data to displayQueue");
         }
-        vTaskDelay(pdMS_TO_TICKS(250));
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
 
 
 void oled_display(const DisplayData_t& data) {
-    Adafruit_SSD1306 display(128, 32, &Wire, -1); // Initialize display with I2C
-    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+    if (oled_begin == 0) {
+        if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+            Serial.println("SSD1306 allocation failed");
+            return; // Exit if display initialization fails
+        }
+        oled_begin = 1; // Set flag to indicate display has been initialized
+        display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Initialize display
+        display.clearDisplay(); // Clear the display buffer
+    }
     display.clearDisplay(); // Clear the display buffer
     display.setCursor(0, 0);                    // Set cursor to top-left corner
     display.setTextSize(1);                     // Set text size to 1   
@@ -159,7 +168,6 @@ void oled_display(const DisplayData_t& data) {
 
 // Display task: handles any sensor data received
 void taskDisplay(void *pvParameters) {
-    Adafruit_SSD1306 display(128, 32, &Wire, -1); // Initialize display with I2C
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
     DisplayData_t data;
 
@@ -209,7 +217,7 @@ void taskDisplay(void *pvParameters) {
         } else {
             Serial.println("DEBUG: taskDisplay timed out waiting for queue");
         }
-        vTaskDelay(pdMS_TO_TICKS(500)); // Yield to other tasks
+        vTaskDelay(pdMS_TO_TICKS(100)); // Yield to other tasks
         display.clearDisplay(); // Clear the display buffer
     
     }

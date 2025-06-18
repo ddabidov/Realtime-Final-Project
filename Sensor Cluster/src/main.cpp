@@ -5,6 +5,9 @@
 #include "dataOutput.h"
 #include "semphr.h"
 #include <Wire.h> // Added for Wire.begin()
+#include <Adafruit_SSD1306.h>
+
+
 
 void i2cScan(void) {
     // Example implementation
@@ -30,7 +33,6 @@ TaskHandle_t baroTaskHandle = NULL;
 TaskHandle_t accelTaskHandle = NULL;
 TaskHandle_t gpsTaskHandle = NULL;
 TaskHandle_t displayTaskHandle = NULL;
-
 
 
 void setup() {
