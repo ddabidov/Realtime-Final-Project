@@ -40,6 +40,13 @@ typedef struct {
     double latitude;
     double longitude;
     double altitude;
+    uint8_t month; // Month of the date
+    uint8_t day;   // Day of the date
+    uint16_t year; // Year of the date
+    uint8_t hour;  // Hour of the time  
+    uint8_t minute; // Minute of the time
+    uint8_t second; // Second of the time
+    
 } GPSData_t;
 
 // Unified display data struct
