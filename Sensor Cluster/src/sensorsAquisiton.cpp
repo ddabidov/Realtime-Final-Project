@@ -24,6 +24,8 @@
 
 int oled_begin = 0;
 
+float barop, barot, accelx, accely, accelz = 0; // Global variables for accelerometer data
+
 Adafruit_SSD1306 display(128, 32, &Wire, -1); // Initialize display with I2C
 
 
@@ -48,11 +50,6 @@ void taskBarometer(void *pvParameters) {
     for (;;) {
         Serial.println("DEBUG: Barometer loop start");
         // Heartbeat: print every 2 seconds to show barometer task is alive
-        static unsigned long lastHeartbeat = 0;
-        if (millis() - lastHeartbeat > 2000) {
-            Serial.println("[HEARTBEAT] Barometer task alive");
-            lastHeartbeat = millis();
-        }
         Serial.println("DEBUG: Barometer about to read temperature");
         baroData.temperature = bmp.readTemperature();
         Serial.println("DEBUG: Barometer finished reading temperature");
@@ -73,7 +70,7 @@ void taskBarometer(void *pvParameters) {
         } else {
             Serial.println("DEBUG: Barometer sent data to displayQueue");
         }
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
     
@@ -101,7 +98,7 @@ void taskAccelerometer(void *pvParameters) {
                 Serial.println("ADXL345 connection failed!");
             }
             accelInitAttempts++;
-            vTaskDelay(pdMS_TO_TICKS(50));
+            vTaskDelay(pdMS_TO_TICKS(100));
             accel.initialize(); // Retry initialization
         }
     }
@@ -126,7 +123,7 @@ void taskAccelerometer(void *pvParameters) {
         } else {
             Serial.println("DEBUG: Accel sent data to displayQueue");
         }
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
@@ -141,30 +138,41 @@ void oled_display(const DisplayData_t& data) {
         display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Initialize display
         display.clearDisplay(); // Clear the display buffer
     }
+
+        switch (data.type){
+        case(SENSOR_ACCEL):
+            accelx = data.data.accel.x; // Store accelerometer data in global variables
+            accely = data.data.accel.y;
+            accelz = data.data.accel.z;
+            break;
+        case(SENSOR_BARO):
+            barop = data.data.baro.pressure; // Store barometer data in global variables
+            barot = data.data.baro.temperature;
+            break;
+        }
     display.clearDisplay(); // Clear the display buffer
-    display.setCursor(0, 0);                    // Set cursor to top-left corner
     display.setTextSize(1);                     // Set text size to 1   
     display.setTextColor(SSD1306_WHITE);        // Set text color to white
-    switch (data.type) { 
-        case SENSOR_BARO:
-            display.setCursor(0, 0);
-            display.print(data.data.baro.pressure, 2);
-            display.print(" ");
-            display.print(data.data.baro.temperature, 2);
-            break;
-        case SENSOR_ACCEL:
-            display.setCursor(0, 0);
-            display.print("\n");
-            display.print(data.data.accel.x, 2);
-            display.print(" "); 
-            display.print(data.data.accel.y, 2);
-            break;
-        default:
-            display.setCursor(0, 0);
-            display.print("Unknown sensor data");
-    }
+    
+    
+    display.setCursor(0, 0);
+    display.print(barop);
+    display.print(" ");
+    display.print(barot);
+
+    display.setCursor(0, 10);
+    display.print(accelx);
+    display.print(" ");
+    display.print(accely);
+    display.print(" ");
+    display.print(accelz); // Print accelerometer data
+
+
+            
     display.display();
+
 }
+    
 
 // Display task: handles any sensor data received
 void taskDisplay(void *pvParameters) {
@@ -190,8 +198,7 @@ void taskDisplay(void *pvParameters) {
                     Serial.print("[BARO] P: ");
                     Serial.print(data.data.baro.pressure);
                     Serial.print(" T: ");
-                    Serial.println(data.data.baro.temperature);
-                    oled_display(data);                          //Also i did not commit any of this stuff
+                    Serial.println(data.data.baro.temperature);                          //Also i did not commit any of this stuff
                     break;
                 case SENSOR_ACCEL:
                     Serial.print("[ACCEL] X: ");
@@ -199,8 +206,7 @@ void taskDisplay(void *pvParameters) {
                     Serial.print(" Y: ");
                     Serial.print(data.data.accel.y);
                     Serial.print(" Z: ");
-                    Serial.println(data.data.accel.z);
-                    oled_display(data);                
+                    Serial.println(data.data.accel.z);              
                     break;
                 case SENSOR_GPS:
                     Serial.print("[GPS] Lat: ");
@@ -217,7 +223,8 @@ void taskDisplay(void *pvParameters) {
         } else {
             Serial.println("DEBUG: taskDisplay timed out waiting for queue");
         }
-        vTaskDelay(pdMS_TO_TICKS(100)); // Yield to other tasks
+        oled_display(data); // Call the OLED display function with the received data
+        vTaskDelay(pdMS_TO_TICKS(70)); // Yield to other tasks
         display.clearDisplay(); // Clear the display buffer
     
     }
