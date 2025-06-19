@@ -25,7 +25,7 @@
 int oled_begin = 0;
 
 float barop, barot, accelx, accely, accelz = 0; // Global variables for accelerometer data
-GPSData_t gpsData;
+float gpsDataLat, gpsDataLong = 0; // Global variables for GPS data
 
 Adafruit_SSD1306 display(128, 32, &Wire, -1); // Initialize display with I2C
 
@@ -47,7 +47,7 @@ void taskBarometer(void *pvParameters) {
             break;
         } else {
             Serial.print("[ERROR] BMP085 not detected. ");
-            vTaskDelay(pdMS_TO_TICKS(2000));
+            vTaskDelay(pdMS_TO_TICKS(100));
             break;
         }
     }
@@ -74,55 +74,56 @@ void taskBarometer(void *pvParameters) {
         } else {
             Serial.println("DEBUG: Barometer sent data to displayQueue");
         }
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
     
-void taskGPS(void *pvParameters) { 
-    TinyGPSPlus gps;
-    DisplayData_t msg;
-    GPS_Serial.setRX(GPS_RX_PIN); // Set RX pin for GPS
-    GPS_Serial.setTX(GPS_TX_PIN); // Set TX pin for GPS
-
-    GPS_Serial.begin(9600); // Initialize GPS serial communication
-    while (1)
-    {
-          
-        while (GPS_Serial.available()>0) {
-            char nmeaChar = GPS_Serial.read();
-            if (gps.encode(nmeaChar)) { 
-            
-                if (gps.location.isValid()) {
-                    msg.data.gps.latitude = gps.location.lat();
-                    msg.data.gps.longitude = gps.location.lng();
-                }
-                if (gps.altitude.isValid()) {
-                    msg.data.gps.altitude = gps.altitude.meters();
-                } 
-                if (gps.date.isValid()) {
-                    msg.data.gps.year = gps.date.year();
-                    msg.data.gps.month = gps.date.month();
-                    msg.data.gps.day = gps.date.day();
-                }
-                if (gps.time.isValid()) {
-                    msg.data.gps.hour = gps.time.hour();
-                    msg.data.gps.minute = gps.time.minute();
-                    msg.data.gps.second = gps.time.second();
-                }
-                msg.type = SENSOR_GPS;
-                msg.msSinceStart = millis(); // Timestamp in ms since start
-                
-                QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
-                BaseType_t gpsSendResult = xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100));
-                if (gpsSendResult != pdPASS) {
-                    Serial.println("ERROR: GPS failed to send to displayQueue!");
-                } else {
-                    Serial.println("DEBUG: GPS sent data to displayQueue");
-                }
-            } 
-        }
- } // Commented out GPS task implementation
-}
+// void taskGPS(void *pvParameters) { 
+    // TinyGPSPlus gps;
+    // DisplayData_t msg;
+    // GPS_Serial.setRX(GPS_RX_PIN); // Set RX pin for GPS
+    // GPS_Serial.setTX(GPS_TX_PIN); // Set TX pin for GPS
+// 
+    // GPS_Serial.begin(9600); // Initialize GPS serial communication
+    // while (1)
+    // {
+        //   
+        // while (GPS_Serial.available()>0) {
+            // char nmeaChar = GPS_Serial.read();
+            // if (gps.encode(nmeaChar)) { 
+            // 
+                // if (gps.location.isValid()) {
+                    // msg.data.gps.latitude = gps.location.lat();
+                    // msg.data.gps.longitude = gps.location.lng();
+                    // msg.data.gps.locationValid = true; // Set location valid flag
+                // }
+                // if (gps.date.isValid()) {
+                    // msg.data.gps.year = gps.date.year();
+                    // msg.data.gps.month = gps.date.month();
+                    // msg.data.gps.day = gps.date.day();
+                    // msg.data.gps.dateValid = true; // Set date valid flag
+                // }
+                // if (gps.time.isValid()) {
+                    // msg.data.gps.hour = gps.time.hour();
+                    // msg.data.gps.minute = gps.time.minute();
+                    // msg.data.gps.second = gps.time.second();
+                    // msg.data.gps.timeValid = true; // Set time valid flag
+                // }
+                // msg.type = SENSOR_GPS;
+                // msg.msSinceStart = millis(); // Timestamp in ms since start
+                // 
+                // QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
+                // BaseType_t gpsSendResult = xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100));
+                // if (gpsSendResult != pdPASS) {
+                    // Serial.println("ERROR: GPS failed to send to displayQueue!");
+                // } else {
+                    // Serial.println("DEBUG: GPS sent data to displayQueue");
+                // }
+            // }
+            // vTaskDelay(pdMS_TO_TICKS(500)); 
+        // }
+//  } // Commented out GPS task implementation
+// }
 
 void taskAccelerometer(void *pvParameters) {
     Serial.println("DEBUG: taskAccelerometer started");
@@ -171,64 +172,86 @@ void taskAccelerometer(void *pvParameters) {
         } else {
             Serial.println("DEBUG: Accel sent data to displayQueue");
         }
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
 
 
-void oled_display(const DisplayData_t& data) {
+// void oled_display(const DisplayData_t& data) {
     
-    if (oled_begin == 0) {
-        if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-            Serial.println("SSD1306 allocation failed");
-            return; // Exit if display initialization fails
-        }
-        oled_begin = 1; // Set flag to indicate display has been initialized
-        display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Initialize display
-        display.clearDisplay(); // Clear the display buffer
-    }
+//     if (oled_begin == 0) {
+//         if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+//             Serial.println("SSD1306 allocation failed");
+//             return; // Exit if display initialization fails
+//         }
+//         oled_begin = 1; // Set flag to indicate display has been initialized
+//         display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Initialize display
+//         display.clearDisplay(); // Clear the display buffer
+//     }
 
-        switch (data.type){
-        case(SENSOR_ACCEL):
-            accelx = data.data.accel.x; // Store accelerometer data in global variables
-            accely = data.data.accel.y;
-            accelz = data.data.accel.z;
-            break;
-        case(SENSOR_BARO):
-            barop = data.data.baro.pressure; // Store barometer data in global variables
-            barot = data.data.baro.temperature;
-            break;
-        case(SENSOR_GPS):
-            gpsData = data.data.gps; // Store GPS data in global variables
-            break;
-        }
-    display.clearDisplay(); // Clear the display buffer
-    display.setTextSize(1);                     // Set text size to 1   
-    display.setTextColor(SSD1306_WHITE);        // Set text color to white
+//         switch (data.type){
+//         case(SENSOR_ACCEL):
+//             accelx = data.data.accel.x; // Store accelerometer data in global variables
+//             accely = data.data.accel.y;
+//             accelz = data.data.accel.z;
+//             break;
+//         case(SENSOR_BARO):
+//             barop = data.data.baro.pressure; // Store barometer data in global variables
+//             barot = data.data.baro.temperature;
+//             break;
+//         case(SENSOR_GPS):
+//             gpsDataLat = data.data.gps.latitude;
+//             gpsDataLong = data.data.gps.longitude; // Store GPS data in global variables
+//             break;
+//         }
+//     display.clearDisplay(); // Clear the display buffer
+//     display.setTextSize(1);                     // Set text size to 1   
+//     display.setTextColor(SSD1306_WHITE);        // Set text color to white
     
     
-    display.setCursor(0, 0);
-    display.print(barop);
-    display.print(" ");
-    display.print(barot);
+//     display.setCursor(0, 0);
+//     display.print(barop);
+//     display.print(" ");
+//     display.print(barot);
 
-    display.setCursor(0, 10);
-    display.print(accelx);
-    display.print(" ");
-    display.print(accely);
-    display.print(" ");
-    display.print(accelz); // Print accelerometer data
+//     display.setCursor(0, 10);
+//     display.print(accelx);
+//     display.print(" ");
+//     display.print(accely);
+//     display.print(" ");
+//     display.print(accelz); // Print accelerometer data
 
-    display.setCursor(0, 20);
-    display.print(gpsData.latitude, 6); // Print GPS latitude
-    display.print(" ");
-    display.print(gpsData.longitude, 6); // Print GPS longitude 
-    display.print(" ");
-    display.print(gpsData.altitude, 2); // Print GPS altitude
-            
-    display.display();
+    // display.setCursor(0, 20);
+    // display.print(gpsDataLat, 4); // Print GPS latitude
+    // display.print(" ");
+    // display.print(gpsDataLong, 4); // Print GPS longitude
+    /*display.setCursor(0, 20);
+    if (gpsData.locationValid) {
+        display.print(gpsData.latitude, 4); // Print GPS latitude
+        display.print(" Lat ");
+        display.print(gpsData.longitude, 4); // Print GPS longitude 
+        display.print(" Long "); // Print GPS altitude
+    } else if (gpsData.dateValid) {
+        display.print(gpsData.day);
+        display.print("-");
+        display.print(gpsData.month);
+        display.print("-");
+        display.print(gpsData.year);
+        display.print(" Date ");
+    } else if (gpsData.timeValid) {
+        display.print(gpsData.hour);
+        display.print(":");
+        display.print(gpsData.minute);
+        display.print(":");
+        display.print(gpsData.second);
+        display.print(" Time ");
+    } else {
+        display.print("No GPS Data");
+    } */
+    
+//     display.display();
 
-}
+// }
     
 
 // Display task: handles any sensor data received
@@ -266,12 +289,16 @@ void taskDisplay(void *pvParameters) {
                     Serial.println(data.data.accel.z);              
                     break;
                 case SENSOR_GPS:
-                    Serial.print("[GPS] Lat: ");
-                    Serial.print(data.data.gps.latitude, 6);
-                    Serial.print(" Lon: ");
-                    Serial.print(data.data.gps.longitude, 6);
-                    Serial.print(" Alt: ");
-                    Serial.println(data.data.gps.altitude, 2);
+                    if (data.data.gps.locationValid) {
+                        Serial.print("[GPS] Lat: ");
+                        Serial.print(data.data.gps.latitude, 6);
+                        Serial.print(" Lon: ");
+                        Serial.print(data.data.gps.longitude, 6);
+                    } else {
+                        Serial.print("[GPS] Location Invalid: ");
+                    }
+                    
+
                     
                     break;
                 default:
@@ -280,8 +307,8 @@ void taskDisplay(void *pvParameters) {
         } else {
             Serial.println("DEBUG: taskDisplay timed out waiting for queue");
         }
-        oled_display(data); // Call the OLED display function with the received data
-        vTaskDelay(pdMS_TO_TICKS(70)); // Yield to other tasks
+        // oled_display(data); // Call the OLED display function with the received data
+        vTaskDelay(pdMS_TO_TICKS(200)); // Yield to other tasks
         display.clearDisplay(); // Clear the display buffer
     
     }

@@ -39,14 +39,15 @@ typedef struct {
 typedef struct {
     double latitude;
     double longitude;
-    double altitude;
     uint8_t month; // Month of the date
     uint8_t day;   // Day of the date
     uint16_t year; // Year of the date
     uint8_t hour;  // Hour of the time  
     uint8_t minute; // Minute of the time
     uint8_t second; // Second of the time
-    
+    bool locationValid; // Flag to indicate if location is valid // Flag to indicate if altitude is valid
+    bool dateValid; // Flag to indicate if date is valid
+    bool timeValid; // Flag to indicate if time is valid
 } GPSData_t;
 
 // Unified display data struct

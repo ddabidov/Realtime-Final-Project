@@ -67,7 +67,7 @@ void setup() {
     Serial.println("DEBUG: taskBarometer created");
     xTaskCreate(taskAccelerometer, "Accel", 4096, (void*)displayQueue, 2, &accelTaskHandle);
     Serial.println("DEBUG: taskAccelerometer created");
-    xTaskCreate(taskGPS, "GPS", 4096, (void*)displayQueue, 2, &gpsTaskHandle);
+   // xTaskCreate(taskGPS, "GPS", 4096, (void*)displayQueue, 2, &gpsTaskHandle);
     Serial.println("DEBUG: taskGPS created");
     xTaskCreate(taskDisplay, "Display", 4096, (void*)displayQueue, 3, &displayTaskHandle); // Increased stack size
     Serial.println("DEBUG: taskDisplay created");
