@@ -22,17 +22,18 @@
 #include "ADXL345.h"
 #include <Adafruit_SSD1306.h>
 
-extern SemaphoreHandle_t serialMutex; // Add this line to fix undefined identifier
-
 int oled_begin = 0;
 
 float barop, barot, accelx, accely, accelz = 0; // Global variables for accelerometer data
+GPSData_t gpsData;
 
 Adafruit_SSD1306 display(128, 32, &Wire, -1); // Initialize display with I2C
 
+#define GPS_RX_PIN 13 // Define RX pin for GPS
+#define GPS_TX_PIN 12 // Define TX pin for GPS
+#define GPS_Serial Serial1 // Assuming GPS is connected to Serial1
 
 void taskBarometer(void *pvParameters) {
-    xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore at the beginning
     Serial.println("DEBUG: taskBarometer started");
 
     BaroData_t baroData;
@@ -50,9 +51,7 @@ void taskBarometer(void *pvParameters) {
             break;
         }
     }
-    xSemaphoreGive(serialMutex); // Give after leaving while loop
     for (;;) {
-        xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore at the beginning
         Serial.println("DEBUG: Barometer loop start");
         // Heartbeat: print every 2 seconds to show barometer task is alive
         Serial.println("DEBUG: Barometer about to read temperature");
@@ -75,19 +74,57 @@ void taskBarometer(void *pvParameters) {
         } else {
             Serial.println("DEBUG: Barometer sent data to displayQueue");
         }
-        xSemaphoreGive(serialMutex); // Give after leaving while loop
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
     
 void taskGPS(void *pvParameters) { 
-    xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore at the beginning
-    
-    xSemaphoreGive(serialMutex); // Give at end
+    TinyGPSPlus gps;
+    DisplayData_t msg;
+    GPS_Serial.setRX(GPS_RX_PIN); // Set RX pin for GPS
+    GPS_Serial.setTX(GPS_TX_PIN); // Set TX pin for GPS
+
+    GPS_Serial.begin(9600); // Initialize GPS serial communication
+    while (1)
+    {
+          
+        while (GPS_Serial.available()>0) {
+            char nmeaChar = GPS_Serial.read();
+            if (gps.encode(nmeaChar)) { 
+            
+                if (gps.location.isValid()) {
+                    msg.data.gps.latitude = gps.location.lat();
+                    msg.data.gps.longitude = gps.location.lng();
+                }
+                if (gps.altitude.isValid()) {
+                    msg.data.gps.altitude = gps.altitude.meters();
+                } 
+                if (gps.date.isValid()) {
+                    msg.data.gps.year = gps.date.year();
+                    msg.data.gps.month = gps.date.month();
+                    msg.data.gps.day = gps.date.day();
+                }
+                if (gps.time.isValid()) {
+                    msg.data.gps.hour = gps.time.hour();
+                    msg.data.gps.minute = gps.time.minute();
+                    msg.data.gps.second = gps.time.second();
+                }
+                msg.type = SENSOR_GPS;
+                msg.msSinceStart = millis(); // Timestamp in ms since start
+                
+                QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
+                BaseType_t gpsSendResult = xQueueSend(displayQueue, &msg, pdMS_TO_TICKS(100));
+                if (gpsSendResult != pdPASS) {
+                    Serial.println("ERROR: GPS failed to send to displayQueue!");
+                } else {
+                    Serial.println("DEBUG: GPS sent data to displayQueue");
+                }
+            } 
+        }
+ } // Commented out GPS task implementation
 }
 
 void taskAccelerometer(void *pvParameters) {
-    xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore at the beginning
     Serial.println("DEBUG: taskAccelerometer started");
 
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
@@ -109,14 +146,12 @@ void taskAccelerometer(void *pvParameters) {
                 Serial.println("ADXL345 connection failed!");
             }
             accelInitAttempts++;
-            vTaskDelay(pdMS_TO_TICKS(500));
+            vTaskDelay(pdMS_TO_TICKS(100));
             accel.initialize(); // Retry initialization
         }
     }
-    xSemaphoreGive(serialMutex); // Give after leaving while loop
     const float scaleFactor = 1.0f / 256.0f;
     while (true) {
-        xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore after leaving while loop
         Serial.println("DEBUG: Accel loop start");
         Serial.println("DEBUG: Accel about to read sensors");
         Serial.println("DEBUG: Accel about to read acceleration");
@@ -136,12 +171,13 @@ void taskAccelerometer(void *pvParameters) {
         } else {
             Serial.println("DEBUG: Accel sent data to displayQueue");
         }
-        xSemaphoreGive(serialMutex); // Give after leaving while loop
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
+
 void oled_display(const DisplayData_t& data) {
+    
     if (oled_begin == 0) {
         if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
             Serial.println("SSD1306 allocation failed");
@@ -162,6 +198,9 @@ void oled_display(const DisplayData_t& data) {
             barop = data.data.baro.pressure; // Store barometer data in global variables
             barot = data.data.baro.temperature;
             break;
+        case(SENSOR_GPS):
+            gpsData = data.data.gps; // Store GPS data in global variables
+            break;
         }
     display.clearDisplay(); // Clear the display buffer
     display.setTextSize(1);                     // Set text size to 1   
@@ -180,7 +219,12 @@ void oled_display(const DisplayData_t& data) {
     display.print(" ");
     display.print(accelz); // Print accelerometer data
 
-
+    display.setCursor(0, 20);
+    display.print(gpsData.latitude, 6); // Print GPS latitude
+    display.print(" ");
+    display.print(gpsData.longitude, 6); // Print GPS longitude 
+    display.print(" ");
+    display.print(gpsData.altitude, 2); // Print GPS altitude
             
     display.display();
 
@@ -189,7 +233,6 @@ void oled_display(const DisplayData_t& data) {
 
 // Display task: handles any sensor data received
 void taskDisplay(void *pvParameters) {
-    xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore at the beginning
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
     DisplayData_t data;
 
@@ -197,27 +240,22 @@ void taskDisplay(void *pvParameters) {
     // Debug: at this point, the code stops running and nothing else is recieved from the serial monitor
     Serial.println("I made it to step 2");
     Serial.println("DEBUG: taskDisplay started and running.");
-    xSemaphoreGive(serialMutex); // Give after setup
+    ///Serial.println("TEST TEST TEST");
+
     for (;;) {
         Serial.println("DEBUG: taskDisplay waiting for queue data...");
         if (xQueueReceive(displayQueue, &data, portMAX_DELAY) == pdPASS) {
-            xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore at the beginning
             //if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
             //    Serial.println("SSD1306 allocation failed");
             //}
             Serial.println("DEBUG: taskDisplay received data, processing...");
-
+            
             switch (data.type) {
                 case SENSOR_BARO:
                     Serial.print("[BARO] P: ");
                     Serial.print(data.data.baro.pressure);
                     Serial.print(" T: ");
-                    Serial.println(data.data.baro.temperature);
-                    //display.setCursor(0, 0);                    //THIS SHIT PRINTS NOTHING AT ALL I AM GOING TO KILL MYSELF
-                    //display.setTextSize(1);                     //AND OUR PARTNER IS USELESS LIKE WHAT THE FUCK WHAT
-                    //display.setTextColor(SSD1306_WHITE);        //DO YOU MEAN THAT YOU FUCKING CHATGPT'ED THE WHOLE REPORT
-                    //display.print(F("[BARO] P: "));             //JSUT FUCKING DO IT YOURSELF YOU TWAT
-                    //display.display();                          //Also i did not commit any of this stuff
+                    Serial.println(data.data.baro.temperature);                          //Also i did not commit any of this stuff
                     break;
                 case SENSOR_ACCEL:
                     Serial.print("[ACCEL] X: ");
@@ -225,7 +263,7 @@ void taskDisplay(void *pvParameters) {
                     Serial.print(" Y: ");
                     Serial.print(data.data.accel.y);
                     Serial.print(" Z: ");
-                    Serial.println(data.data.accel.z);
+                    Serial.println(data.data.accel.z);              
                     break;
                 case SENSOR_GPS:
                     Serial.print("[GPS] Lat: ");
@@ -234,6 +272,7 @@ void taskDisplay(void *pvParameters) {
                     Serial.print(data.data.gps.longitude, 6);
                     Serial.print(" Alt: ");
                     Serial.println(data.data.gps.altitude, 2);
+                    
                     break;
                 default:
                     Serial.println("[UNKNOWN SENSOR DATA]");
@@ -242,8 +281,8 @@ void taskDisplay(void *pvParameters) {
             Serial.println("DEBUG: taskDisplay timed out waiting for queue");
         }
         oled_display(data); // Call the OLED display function with the received data
-        xSemaphoreGive(serialMutex); // Give after setup
         vTaskDelay(pdMS_TO_TICKS(70)); // Yield to other tasks
         display.clearDisplay(); // Clear the display buffer
+    
     }
 }
