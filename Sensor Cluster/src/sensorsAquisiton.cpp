@@ -22,8 +22,6 @@
 #include "ADXL345.h"
 #include <Adafruit_SSD1306.h>
 
-<<<<<<< Updated upstream
-=======
 extern SemaphoreHandle_t serialMutex; // Add this line to fix undefined identifier
 
 int oled_begin = 0;
@@ -31,7 +29,6 @@ int oled_begin = 0;
 float barop, barot, accelx, accely, accelz = 0; // Global variables for accelerometer data
 
 Adafruit_SSD1306 display(128, 32, &Wire, -1); // Initialize display with I2C
->>>>>>> Stashed changes
 
 
 void taskBarometer(void *pvParameters) {
@@ -58,11 +55,6 @@ void taskBarometer(void *pvParameters) {
         xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore at the beginning
         Serial.println("DEBUG: Barometer loop start");
         // Heartbeat: print every 2 seconds to show barometer task is alive
-        static unsigned long lastHeartbeat = 0;
-        if (millis() - lastHeartbeat > 2000) {
-            Serial.println("[HEARTBEAT] Barometer task alive");
-            lastHeartbeat = millis();
-        }
         Serial.println("DEBUG: Barometer about to read temperature");
         baroData.temperature = bmp.readTemperature();
         Serial.println("DEBUG: Barometer finished reading temperature");
@@ -83,18 +75,14 @@ void taskBarometer(void *pvParameters) {
         } else {
             Serial.println("DEBUG: Barometer sent data to displayQueue");
         }
-<<<<<<< Updated upstream
-        vTaskDelay(pdMS_TO_TICKS(500));
-=======
         xSemaphoreGive(serialMutex); // Give after leaving while loop
         vTaskDelay(pdMS_TO_TICKS(100));
->>>>>>> Stashed changes
     }
 }
     
 void taskGPS(void *pvParameters) { 
     xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore at the beginning
-    Serial.println("GPS TASK"); 
+    
     xSemaphoreGive(serialMutex); // Give at end
 }
 
@@ -153,20 +141,6 @@ void taskAccelerometer(void *pvParameters) {
     }
 }
 
-<<<<<<< Updated upstream
-
-
-// Display task: handles any sensor data received
-void taskDisplay(void *pvParameters) {
-    //Adafruit_SSD1306 display(128, 32, &Wire, -1); // Initialize display with I2C
-    //if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    //    Serial.println("SSD1306 allocation failed");
-    //    for(;;); // Halt if display fails
-    //}
-    //display.clearDisplay(); // Clear the display buffer
-
-    
-=======
 void oled_display(const DisplayData_t& data) {
     if (oled_begin == 0) {
         if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
@@ -216,7 +190,6 @@ void oled_display(const DisplayData_t& data) {
 // Display task: handles any sensor data received
 void taskDisplay(void *pvParameters) {
     xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore at the beginning
->>>>>>> Stashed changes
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
     DisplayData_t data;
 
@@ -228,13 +201,10 @@ void taskDisplay(void *pvParameters) {
     for (;;) {
         Serial.println("DEBUG: taskDisplay waiting for queue data...");
         if (xQueueReceive(displayQueue, &data, portMAX_DELAY) == pdPASS) {
-<<<<<<< Updated upstream
-=======
             xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore at the beginning
             //if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
             //    Serial.println("SSD1306 allocation failed");
             //}
->>>>>>> Stashed changes
             Serial.println("DEBUG: taskDisplay received data, processing...");
 
             switch (data.type) {
@@ -271,13 +241,9 @@ void taskDisplay(void *pvParameters) {
         } else {
             Serial.println("DEBUG: taskDisplay timed out waiting for queue");
         }
-<<<<<<< Updated upstream
-        vTaskDelay(pdMS_TO_TICKS(10)); // Yield to other tasks
-=======
         oled_display(data); // Call the OLED display function with the received data
         xSemaphoreGive(serialMutex); // Give after setup
         vTaskDelay(pdMS_TO_TICKS(70)); // Yield to other tasks
         display.clearDisplay(); // Clear the display buffer
->>>>>>> Stashed changes
     }
 }
