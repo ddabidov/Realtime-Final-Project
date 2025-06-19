@@ -22,9 +22,20 @@
 #include "ADXL345.h"
 #include <Adafruit_SSD1306.h>
 
+<<<<<<< Updated upstream
+=======
+extern SemaphoreHandle_t serialMutex; // Add this line to fix undefined identifier
+
+int oled_begin = 0;
+
+float barop, barot, accelx, accely, accelz = 0; // Global variables for accelerometer data
+
+Adafruit_SSD1306 display(128, 32, &Wire, -1); // Initialize display with I2C
+>>>>>>> Stashed changes
 
 
 void taskBarometer(void *pvParameters) {
+    xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore at the beginning
     Serial.println("DEBUG: taskBarometer started");
 
     BaroData_t baroData;
@@ -42,7 +53,9 @@ void taskBarometer(void *pvParameters) {
             break;
         }
     }
+    xSemaphoreGive(serialMutex); // Give after leaving while loop
     for (;;) {
+        xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore at the beginning
         Serial.println("DEBUG: Barometer loop start");
         // Heartbeat: print every 2 seconds to show barometer task is alive
         static unsigned long lastHeartbeat = 0;
@@ -70,13 +83,23 @@ void taskBarometer(void *pvParameters) {
         } else {
             Serial.println("DEBUG: Barometer sent data to displayQueue");
         }
+<<<<<<< Updated upstream
         vTaskDelay(pdMS_TO_TICKS(500));
+=======
+        xSemaphoreGive(serialMutex); // Give after leaving while loop
+        vTaskDelay(pdMS_TO_TICKS(100));
+>>>>>>> Stashed changes
     }
 }
     
-void taskGPS(void *pvParameters) { Serial.println("GPS TASK"); } // Commented out GPS task implementation
+void taskGPS(void *pvParameters) { 
+    xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore at the beginning
+    Serial.println("GPS TASK"); 
+    xSemaphoreGive(serialMutex); // Give at end
+}
 
 void taskAccelerometer(void *pvParameters) {
+    xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore at the beginning
     Serial.println("DEBUG: taskAccelerometer started");
 
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
@@ -102,8 +125,10 @@ void taskAccelerometer(void *pvParameters) {
             accel.initialize(); // Retry initialization
         }
     }
+    xSemaphoreGive(serialMutex); // Give after leaving while loop
     const float scaleFactor = 1.0f / 256.0f;
     while (true) {
+        xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore after leaving while loop
         Serial.println("DEBUG: Accel loop start");
         Serial.println("DEBUG: Accel about to read sensors");
         Serial.println("DEBUG: Accel about to read acceleration");
@@ -123,10 +148,12 @@ void taskAccelerometer(void *pvParameters) {
         } else {
             Serial.println("DEBUG: Accel sent data to displayQueue");
         }
+        xSemaphoreGive(serialMutex); // Give after leaving while loop
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
+<<<<<<< Updated upstream
 
 
 // Display task: handles any sensor data received
@@ -139,6 +166,57 @@ void taskDisplay(void *pvParameters) {
     //display.clearDisplay(); // Clear the display buffer
 
     
+=======
+void oled_display(const DisplayData_t& data) {
+    if (oled_begin == 0) {
+        if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+            Serial.println("SSD1306 allocation failed");
+            return; // Exit if display initialization fails
+        }
+        oled_begin = 1; // Set flag to indicate display has been initialized
+        display.begin(SSD1306_SWITCHCAPVCC, 0x3C); // Initialize display
+        display.clearDisplay(); // Clear the display buffer
+    }
+
+        switch (data.type){
+        case(SENSOR_ACCEL):
+            accelx = data.data.accel.x; // Store accelerometer data in global variables
+            accely = data.data.accel.y;
+            accelz = data.data.accel.z;
+            break;
+        case(SENSOR_BARO):
+            barop = data.data.baro.pressure; // Store barometer data in global variables
+            barot = data.data.baro.temperature;
+            break;
+        }
+    display.clearDisplay(); // Clear the display buffer
+    display.setTextSize(1);                     // Set text size to 1   
+    display.setTextColor(SSD1306_WHITE);        // Set text color to white
+    
+    
+    display.setCursor(0, 0);
+    display.print(barop);
+    display.print(" ");
+    display.print(barot);
+
+    display.setCursor(0, 10);
+    display.print(accelx);
+    display.print(" ");
+    display.print(accely);
+    display.print(" ");
+    display.print(accelz); // Print accelerometer data
+
+
+            
+    display.display();
+
+}
+    
+
+// Display task: handles any sensor data received
+void taskDisplay(void *pvParameters) {
+    xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore at the beginning
+>>>>>>> Stashed changes
     QueueHandle_t displayQueue = (QueueHandle_t)pvParameters;
     DisplayData_t data;
 
@@ -146,11 +224,17 @@ void taskDisplay(void *pvParameters) {
     // Debug: at this point, the code stops running and nothing else is recieved from the serial monitor
     Serial.println("I made it to step 2");
     Serial.println("DEBUG: taskDisplay started and running.");
-    ///Serial.println("TEST TEST TEST");
-
+    xSemaphoreGive(serialMutex); // Give after setup
     for (;;) {
         Serial.println("DEBUG: taskDisplay waiting for queue data...");
         if (xQueueReceive(displayQueue, &data, portMAX_DELAY) == pdPASS) {
+<<<<<<< Updated upstream
+=======
+            xSemaphoreTake(serialMutex, portMAX_DELAY); // Take semaphore at the beginning
+            //if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+            //    Serial.println("SSD1306 allocation failed");
+            //}
+>>>>>>> Stashed changes
             Serial.println("DEBUG: taskDisplay received data, processing...");
 
             switch (data.type) {
@@ -187,6 +271,13 @@ void taskDisplay(void *pvParameters) {
         } else {
             Serial.println("DEBUG: taskDisplay timed out waiting for queue");
         }
+<<<<<<< Updated upstream
         vTaskDelay(pdMS_TO_TICKS(10)); // Yield to other tasks
+=======
+        oled_display(data); // Call the OLED display function with the received data
+        xSemaphoreGive(serialMutex); // Give after setup
+        vTaskDelay(pdMS_TO_TICKS(70)); // Yield to other tasks
+        display.clearDisplay(); // Clear the display buffer
+>>>>>>> Stashed changes
     }
 }
